@@ -1,0 +1,56 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "vcpkg",
+      "displayName": "MSVC 2022 x64 + vcpkg（需设置 VCPKG_ROOT）",
+      "generator": "Visual Studio 17 2022",
+      "architecture": { "value": "x64", "strategy": "set" },
+      "binaryDir": "${sourceDir}/build/vcpkg",
+      "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+      "cacheVariables": {
+        "VCPKG_TARGET_TRIPLET": "x64-windows"
+      }
+    },
+    {
+      "name": "vcpkg-local",
+      "displayName": "MSVC 2022 x64 + 本机 vcpkg (E:/vcpkg/vcpkg)",
+      "generator": "Visual Studio 17 2022",
+      "architecture": { "value": "x64", "strategy": "set" },
+      "binaryDir": "${sourceDir}/build/vcpkg-local",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "E:/vcpkg/vcpkg/scripts/buildsystems/vcpkg.cmake",
+        "VCPKG_TARGET_TRIPLET": "x64-windows"
+      }
+    },
+    {
+      "name": "system",
+      "displayName": "MSVC 2022 x64 + 系统 wxWidgets",
+      "generator": "Visual Studio 17 2022",
+      "architecture": { "value": "x64", "strategy": "set" },
+      "binaryDir": "${sourceDir}/build/system"
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "vcpkg-release",
+      "configurePreset": "vcpkg",
+      "configuration": "Release"
+    },
+    {
+      "name": "vcpkg-debug",
+      "configurePreset": "vcpkg",
+      "configuration": "Debug"
+    },
+    {
+      "name": "vcpkg-local-release",
+      "configurePreset": "vcpkg-local",
+      "configuration": "Release"
+    },
+    {
+      "name": "system-release",
+      "configurePreset": "system",
+      "configuration": "Release"
+    }
+  ]
+}

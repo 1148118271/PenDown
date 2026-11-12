@@ -1,0 +1,27 @@
+﻿#pragma once
+
+#include <wx/defs.h>
+
+// 主界面、便签窗口用到的命令 ID
+enum {
+    ID_NOTE_TREE = wxID_HIGHEST + 100,
+
+    ID_NOTE_ADD_GROUP,
+    ID_NOTE_ADD,
+    ID_NOTE_ADD_MARKDOWN,
+
+    ID_NOTE_SAVE,
+    ID_NOTE_PREVIEW,
+    ID_NOTE_DELETE,
+
+    ID_FORMAT_BOLD,
+    ID_FORMAT_ITALIC,
+    ID_FORMAT_STRIKE,
+    ID_FORMAT_COLOUR,
+
+    ID_WINDOW_MINIMIZE,
+    ID_WINDOW_MAXIMIZE,
+    ID_WINDOW_CLOSE,
+
+    ID_SETTINGS,
+};

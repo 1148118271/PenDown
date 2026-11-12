@@ -507,9 +507,7 @@ void MainFrame::CreateTrayIcon() {
 void MainFrame::HideToTray() {
     if (hiddenToTray_) return;
     hiddenToTray_ = true;
-    for (NoteWindow* window : noteWindows_) {
-        if (window) window->Hide();
-    }
+    // 只隐藏主窗口，打开的便签窗口继续保持原状；它们只有在退出应用时才关闭。
     Hide();
 #ifdef __WXMSW__
     // 隐藏到托盘后把工作集交还系统，任务管理器里的内存占用会明显下降；
@@ -522,9 +520,6 @@ void MainFrame::RestoreFromTray() {
     hiddenToTray_ = false;
     Iconize(false);
     Show(true);
-    for (NoteWindow* window : noteWindows_) {
-        if (window) window->Show(true);
-    }
     Raise();
     if (tree_) tree_->SetFocus();
 }
@@ -817,7 +812,12 @@ void MainFrame::OnClose(wxCloseEvent& event) {
 
     std::vector<NoteWindow*> windows = noteWindows_;
     for (NoteWindow* window : windows) {
-        if (window && !window->Close()) {
+        if (!window) continue;
+        // 退出前先恢复可能被最小化的便签，保证未保存提示可见。
+        if (window->IsIconized()) window->Iconize(false);
+        window->Show(true);
+        window->Raise();
+        if (!window->Close()) {
             shuttingDown_ = false;
             reallyExit_ = false;
             event.Veto();

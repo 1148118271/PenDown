@@ -113,7 +113,9 @@ NoteWindow::NoteWindow(wxWindow* parent, std::shared_ptr<NoteStore> store,
                        const std::wstring& notePath, const std::wstring& groupPath,
                        NoteFormat format, SavedHandler onSaved, DeletedHandler onDeleted,
                        ClosedHandler onClosed)
-    : wxFrame(parent, wxID_ANY, L"PenDown", wxDefaultPosition, wxDefaultSize,
+    // 便签窗口不挂在主窗口下面：主窗口最小化或隐藏到托盘时，便签仍保持独立，
+    // 只有真正退出应用时才由 MainFrame 统一关闭。parent 仅用于定位所在屏幕。
+    : wxFrame(nullptr, wxID_ANY, L"PenDown", wxDefaultPosition, wxDefaultSize,
               wxBORDER_NONE | wxRESIZE_BORDER | wxCLIP_CHILDREN),
       store_(std::move(store)),
       notePath_(notePath),
@@ -144,8 +146,8 @@ NoteWindow::NoteWindow(wxWindow* parent, std::shared_ptr<NoteStore> store,
 
     // 新便签默认出现在主窗口所在屏幕的中间。
     int displayIndex = wxNOT_FOUND;
-    if (wxWindow* owner = GetParent()) {
-        displayIndex = wxDisplay::GetFromWindow(owner);
+    if (parent) {
+        displayIndex = wxDisplay::GetFromWindow(parent);
     }
     if (displayIndex == wxNOT_FOUND) displayIndex = 0;
     const wxRect workArea = wxDisplay(static_cast<unsigned>(displayIndex)).GetClientArea();

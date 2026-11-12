@@ -1134,13 +1134,16 @@ void MainFrame::RenameSelected() {
 }
 
 void MainFrame::RenameGroup(const std::wstring& groupPath) {
-    if (LowerText(groupPath) == LowerText(store_ ? store_->DefaultGroupPath() : L"默认分组")) {
+    // groupPath 可能引用 selectedGroupPath_，先复制，避免后面赋值时被改掉。
+    const std::wstring targetPath = groupPath;
+    if (LowerText(targetPath) ==
+        LowerText(store_ ? store_->DefaultGroupPath() : L"默认分组")) {
         wxMessageBox(L"默认分组不能重命名。", L"PenDown", wxOK | wxICON_INFORMATION, this);
         return;
     }
     const NoteGroupEntry* target = nullptr;
     for (const NoteGroupEntry& group : groups_) {
-        if (group.rel_path == groupPath) {
+        if (group.rel_path == targetPath) {
             target = &group;
             break;
         }
@@ -1149,7 +1152,7 @@ void MainFrame::RenameGroup(const std::wstring& groupPath) {
     std::wstring oldName = target->name;
 
     std::set<std::wstring> subtree;
-    CollectGroupTree(groupPath, subtree);
+    CollectGroupTree(targetPath, subtree);
 
     bool hasOpenWindow = false;
     for (NoteWindow* window : noteWindows_) {
@@ -1176,7 +1179,7 @@ void MainFrame::RenameGroup(const std::wstring& groupPath) {
 
     std::wstring renamed;
     std::wstring error;
-    if (!store_ || !store_->RenameGroup(groupPath, ToW(dialog.GetValue()), renamed, error)) {
+    if (!store_ || !store_->RenameGroup(targetPath, ToW(dialog.GetValue()), renamed, error)) {
         wxMessageBox(wxString(L"重命名分组失败：\n") + FromW(error), L"PenDown",
                      wxOK | wxICON_ERROR, this);
         return;
@@ -1184,10 +1187,10 @@ void MainFrame::RenameGroup(const std::wstring& groupPath) {
 
     selectedGroupPath_ = renamed;
     selectedNotePath_.clear();
-    ReplaceGroupPrefixInModel(groupPath, renamed);
+    ReplaceGroupPrefixInModel(targetPath, renamed);
     std::set<std::wstring> expanded;
     for (const std::wstring& item : expandedGroups_) {
-        expanded.insert(ReplacePathPrefix(item, groupPath, renamed));
+        expanded.insert(ReplacePathPrefix(item, targetPath, renamed));
     }
     expandedGroups_.swap(expanded);
     RebuildTree();
@@ -1307,39 +1310,45 @@ void MainFrame::DeleteSelected() {
 }
 
 void MainFrame::DeleteGroup(const std::wstring& groupPath) {
-    if (LowerText(groupPath) == LowerText(store_ ? store_->DefaultGroupPath() : L"默认分组")) {
+    // groupPath 可能是 selectedGroupPath_ 的引用，后面会改 selectedGroupPath_，
+    // 必须先复制，否则删除目标会变成父分组。
+    const std::wstring targetPath = groupPath;
+    if (LowerText(targetPath) ==
+        LowerText(store_ ? store_->DefaultGroupPath() : L"默认分组")) {
         wxMessageBox(L"默认分组不能删除。", L"PenDown", wxOK | wxICON_INFORMATION, this);
         return;
     }
 
     std::set<std::wstring> subtree;
-    CollectGroupTree(groupPath, subtree);
+    CollectGroupTree(targetPath, subtree);
     int answer = wxMessageBox(
-        wxString(L"删除分组「") + FromW(GroupName(groupPath)) +
+        wxString(L"删除分组「") + FromW(GroupName(targetPath)) +
             L"」及其中所有子分组和便签？\n删除后无法恢复。",
         L"删除分组", wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION, this);
     if (answer != wxYES) return;
 
     CloseNoteWindowsInGroups(subtree);
     std::wstring error;
-    if (!store_ || !store_->DeleteGroup(groupPath, error)) {
+    if (!store_ || !store_->DeleteGroup(targetPath, error)) {
         wxMessageBox(wxString(L"删除分组失败：\n") + FromW(error), L"PenDown",
                      wxOK | wxICON_ERROR, this);
         return;
     }
 
     for (const std::wstring& path : subtree) expandedGroups_.erase(path);
-    std::wstring parent = GroupParent(groupPath);
+    std::wstring parent = GroupParent(targetPath);
     selectedGroupPath_ =
         parent.empty() ? (store_ ? store_->DefaultGroupPath() : L"默认分组") : parent;
     selectedNotePath_.clear();
-    RemoveGroupSubtreeFromModel(groupPath);
+    RemoveGroupSubtreeFromModel(targetPath);
     RebuildTree();
     tree_->SelectItem(NoteTreeCtrl::Kind::Group, selectedGroupPath_);
 }
 
 void MainFrame::DeleteNote(const std::wstring& notePath) {
-    const NoteFileEntry* note = FindNote(notePath);
+    // notePath 可能是 selectedNotePath_ 的引用，后面会 clear，必须先复制。
+    const std::wstring targetPath = notePath;
+    const NoteFileEntry* note = FindNote(targetPath);
     if (!note) return;
     std::wstring title = note->title;
     std::wstring groupPath = note->group_path;
@@ -1348,14 +1357,14 @@ void MainFrame::DeleteNote(const std::wstring& notePath) {
                               L"删除便签", wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION, this);
     if (answer != wxYES) return;
 
-    if (NoteWindow* window = FindNoteWindow(notePath)) {
+    if (NoteWindow* window = FindNoteWindow(targetPath)) {
         noteWindows_.erase(std::remove(noteWindows_.begin(), noteWindows_.end(), window),
                            noteWindows_.end());
         window->Destroy();
     }
 
     std::wstring error;
-    if (!store_ || !store_->DeleteNote(notePath, error)) {
+    if (!store_ || !store_->DeleteNote(targetPath, error)) {
         wxMessageBox(wxString(L"删除便签失败：\n") + FromW(error), L"PenDown",
                      wxOK | wxICON_ERROR, this);
         return;
@@ -1363,7 +1372,7 @@ void MainFrame::DeleteNote(const std::wstring& notePath) {
 
     selectedGroupPath_ = groupPath;
     selectedNotePath_.clear();
-    OnNoteDeleted(notePath, groupPath);
+    OnNoteDeleted(targetPath, groupPath);
     tree_->SelectItem(NoteTreeCtrl::Kind::Group, groupPath);
 }
 

@@ -115,7 +115,7 @@ private:
     std::set<std::wstring> expandedGroups_;
     std::vector<NoteWindow*> noteWindows_;
 
-    std::wstring selectedGroupPath_ = L"默认分组";
+    std::wstring selectedGroupPath_;
     std::wstring selectedNotePath_;
     bool expansionInitialized_ = false;
     bool shuttingDown_ = false;

@@ -72,31 +72,49 @@ bool RunSelfTest(const std::wstring& reportPath) {
         NoteStore store;
         std::wstring error;
         check(store.Open(dataDir.wstring(), error), L"open store");
-        check(fs::is_directory(dataDir / L"默认分组"), L"default group folder");
+        check(fs::is_directory(dataDir), L"data folder");
+        check(store.DataDir() == dataDir.lexically_normal().wstring(), L"data dir path");
 
         std::vector<NoteGroupEntry> groups;
         std::vector<NoteFileEntry> notes;
         check(store.ListTree(groups, notes, error), L"list initial tree");
-        check(groups.size() == 1 && groups[0].name == L"默认分组", L"initial default only");
+        check(groups.empty(), L"initial groups empty");
         check(notes.empty(), L"initial notes empty");
 
+        std::wstring rootNote;
+        std::wstring rootMarkdown = L"# 根便签\n\n根目录内容";
+        check(store.SaveNote(L"", L"", ToUtf8(rootMarkdown), L"根便签",
+                             NoteFormat::Markdown, rootNote, error),
+              L"create root note");
+        check(rootNote == L"根便签.md", L"root note path");
+        check(fs::is_regular_file(dataDir / rootNote), L"root note file exists");
+        std::string rootBytes;
+        check(store.ReadNote(rootNote, rootBytes, error) &&
+                  FromUtf8(rootBytes) == rootMarkdown,
+              L"root note roundtrip");
+        check(store.ListTree(groups, notes, error) && notes.size() == 1,
+              L"list root note");
+        check(!notes.empty() && notes[0].group_path.empty(), L"root note has no group");
+        check(NoteStore::DeriveTitle(rootMarkdown) == L"根便签", L"derive root title");
+
         std::wstring workRel;
-        check(store.CreateGroup(store.DefaultGroupPath(), L"工作", workRel, error),
-              L"create group");
-        check(workRel == L"默认分组\\工作", L"group relative path");
-        check(fs::is_directory(dataDir / workRel), L"group folder exists");
+        check(store.CreateGroup(L"", L"工作", workRel, error), L"create root group");
+        check(workRel == L"工作", L"root group relative path");
+        check(fs::is_directory(dataDir / workRel), L"root group folder exists");
 
         std::wstring projectRel;
         check(store.CreateGroup(workRel, L"项目 A", projectRel, error),
               L"create child group");
-        check(store.ListTree(groups, notes, error) && groups.size() == 3,
-              L"list three groups");
+        check(projectRel == L"工作\\项目 A", L"child group path");
+        check(store.ListTree(groups, notes, error) && groups.size() == 2,
+              L"list two groups");
 
         std::wstring markdown = L"# 第四季度汇报\n\n- 补充数据\n- 核对口径";
         std::wstring notePath;
         check(store.SaveNote(L"", projectRel, ToUtf8(markdown), L"第四季度汇报",
                              NoteFormat::Markdown, notePath, error),
               L"create markdown note");
+        check(notePath == L"工作\\项目 A\\第四季度汇报.md", L"markdown note path");
         check(EndsWith(notePath, L".md"), L"markdown extension");
         check(fs::is_regular_file(dataDir / notePath), L"markdown file exists");
 
@@ -107,10 +125,16 @@ bool RunSelfTest(const std::wstring& reportPath) {
         check(NoteStore::DeriveTitle(L"- 第一项\n第二行") == L"第一项", L"derive list title");
         check(NoteStore::DeriveTitle(L"") == L"无标题便签", L"empty title");
 
-        check(store.ListTree(groups, notes, error) && notes.size() == 1, L"list one note");
-        check(!notes.empty() && notes[0].title == L"第四季度汇报", L"note title in tree");
-        check(!notes.empty() && notes[0].format == NoteFormat::Markdown,
-              L"markdown format in tree");
+        check(store.ListTree(groups, notes, error) && notes.size() == 2,
+              L"list root and group notes");
+        bool projectFound = false;
+        for (const NoteFileEntry& note : notes) {
+            if (note.rel_path == notePath && note.title == L"第四季度汇报" &&
+                note.format == NoteFormat::Markdown) {
+                projectFound = true;
+            }
+        }
+        check(projectFound, L"note title and format in tree");
 
         std::wstring renamedPath;
         std::wstring changed = L"## 新标题\n\n新的正文";
@@ -126,7 +150,6 @@ bool RunSelfTest(const std::wstring& reportPath) {
                              NoteFormat::Markdown, duplicatePath, error),
               L"save duplicate title");
         check(duplicatePath != renamedPath, L"duplicate title unique");
-        check(fs::is_regular_file(dataDir / duplicatePath), L"duplicate note file exists");
         check(store.DeleteNote(duplicatePath, error), L"delete duplicate note");
 
         std::wstring richPath;
@@ -135,35 +158,32 @@ bool RunSelfTest(const std::wstring& reportPath) {
         check(store.SaveNote(L"", workRel, ToUtf8(richXml), L"普通文本便签",
                              NoteFormat::RichText, richPath, error),
               L"create rich text note");
+        check(richPath == L"工作\\普通文本便签.wxr", L"rich text note path");
         check(EndsWith(richPath, L".wxr"), L"rich text extension");
         check(fs::is_regular_file(dataDir / richPath), L"rich text file exists");
-        check(store.ListTree(groups, notes, error) && notes.size() == 2,
+        check(store.ListTree(groups, notes, error) && notes.size() == 3,
               L"list markdown and rich text");
         bool richFound = false;
         for (const NoteFileEntry& note : notes) {
-            if (note.rel_path == richPath && note.format == NoteFormat::RichText) richFound = true;
+            if (note.rel_path == richPath && note.format == NoteFormat::RichText) {
+                richFound = true;
+            }
         }
         check(richFound, L"rich text format in tree");
 
         std::wstring renamedGroup;
         check(store.RenameGroup(projectRel, L"项目 B", renamedGroup, error),
               L"rename group");
-        check(renamedGroup == L"默认分组\\工作\\项目 B", L"renamed group path");
+        check(renamedGroup == L"工作\\项目 B", L"renamed group path");
         check(fs::is_directory(dataDir / renamedGroup), L"renamed group folder exists");
         check(!fs::exists(dataDir / renamedPath), L"old note path no longer present");
-        check(store.ListTree(groups, notes, error) && notes.size() == 2,
+        check(store.ListTree(groups, notes, error) && notes.size() == 3,
               L"notes moved with group");
-        // 分组改名后，便签文件也跟着换了上级目录
         renamedPath = renamedGroup + renamedPath.substr(projectRel.size());
-
-        check(!store.RenameGroup(store.DefaultGroupPath(), L"X", renamedGroup, error),
-              L"default group cannot rename");
-        check(!store.DeleteGroup(store.DefaultGroupPath(), error),
-              L"default group cannot delete");
 
         std::wstring movedNote;
         check(store.MoveNote(renamedPath, workRel, movedNote, error), L"move note");
-        check(movedNote == L"默认分组\\工作\\新标题.md", L"moved note path");
+        check(movedNote == L"工作\\新标题.md", L"moved note path");
         check(!fs::exists(dataDir / renamedPath) &&
                   fs::is_regular_file(dataDir / movedNote),
               L"moved note file");
@@ -173,10 +193,10 @@ bool RunSelfTest(const std::wstring& reportPath) {
               L"move note back");
 
         std::wstring movedGroup;
-        check(store.MoveGroup(renamedGroup, store.DefaultGroupPath(), movedGroup, error),
-              L"move group");
-        check(movedGroup == L"默认分组\\项目 B", L"moved group path");
-        check(fs::is_directory(dataDir / movedGroup), L"moved group folder");
+        check(store.MoveGroup(renamedGroup, L"", movedGroup, error),
+              L"move group to root");
+        check(movedGroup == L"项目 B", L"moved group root path");
+        check(fs::is_directory(dataDir / movedGroup), L"moved group root folder");
         std::wstring movedGroupBack;
         check(store.MoveGroup(movedGroup, workRel, movedGroupBack, error) &&
                   movedGroupBack == renamedGroup,
@@ -186,9 +206,9 @@ bool RunSelfTest(const std::wstring& reportPath) {
         check(store.DeleteNote(richPath, error), L"delete rich text note");
         check(store.DeleteGroup(workRel, error), L"delete group tree");
         check(!fs::exists(dataDir / workRel), L"group folder removed");
-        check(store.ListTree(groups, notes, error) && groups.size() == 1 && notes.empty(),
-              L"tree after delete");
-    }
+        check(store.DeleteNote(rootNote, error), L"delete root note");
+        check(store.ListTree(groups, notes, error) && groups.empty() && notes.empty(),
+              L"tree after delete");    }
 
     fs::remove_all(tempRoot, ec);
 

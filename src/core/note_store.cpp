@@ -14,8 +14,6 @@ namespace fs = std::filesystem;
 
 namespace {
 
-const wchar_t* kDefaultGroupName = L"默认分组";
-
 std::wstring Trim(const std::wstring& text) {
     size_t begin = 0;
     size_t end = text.size();
@@ -164,17 +162,6 @@ bool NoteStore::Open(const std::wstring& dataDir, std::wstring& error) {
            (dataDir_.back() == L'\\' || dataDir_.back() == L'/')) {
         dataDir_.pop_back();
     }
-    defaultGroupPath_ = kDefaultGroupName;
-    return EnsureDefaultGroup(error);
-}
-
-bool NoteStore::EnsureDefaultGroup(std::wstring& error) {
-    std::error_code ec;
-    fs::create_directories(AbsolutePath(defaultGroupPath_), ec);
-    if (ec) {
-        error = L"无法创建默认分组目录：" + AbsolutePath(defaultGroupPath_);
-        return false;
-    }
     return true;
 }
 
@@ -227,7 +214,7 @@ bool NoteStore::ListTree(std::vector<NoteGroupEntry>& groups, std::vector<NoteFi
                 continue;
             }
 
-            if (!entry.is_regular_file(entryError) || relDir.empty()) continue;
+            if (!entry.is_regular_file(entryError)) continue;
             std::wstring extension = Lower(entry.path().extension().wstring());
             NoteFormat format = NoteFormat::Markdown;
             if (extension == L".md") {
@@ -310,10 +297,6 @@ bool NoteStore::CreateGroup(const std::wstring& parentRel, const std::wstring& n
 
 bool NoteStore::RenameGroup(const std::wstring& relPath, const std::wstring& newName,
                             std::wstring& newRel, std::wstring& error) {
-    if (Lower(relPath) == Lower(defaultGroupPath_)) {
-        error = L"默认分组不能重命名";
-        return false;
-    }
     if (!IsSafeRelative(relPath) || relPath.empty()) {
         error = L"分组路径无效";
         return false;
@@ -351,17 +334,12 @@ bool NoteStore::RenameGroup(const std::wstring& relPath, const std::wstring& new
 
 bool NoteStore::MoveGroup(const std::wstring& relPath, const std::wstring& newParentRel,
                           std::wstring& newRel, std::wstring& error) {
-    if (Lower(relPath) == Lower(defaultGroupPath_)) {
-        error = L"默认分组不能移动";
-        return false;
-    }
     if (!IsSafeRelative(relPath) || relPath.empty() || !IsSafeRelative(newParentRel)) {
         error = L"分组路径无效";
         return false;
     }
 
-    const std::wstring targetParentRel =
-        newParentRel.empty() ? defaultGroupPath_ : newParentRel;
+    const std::wstring targetParentRel = newParentRel;
     const std::wstring currentParentRel = fs::path(relPath).parent_path().wstring();
     if (Lower(targetParentRel) == Lower(currentParentRel)) {
         error = L"分组已经在该分组下";
@@ -370,7 +348,8 @@ bool NoteStore::MoveGroup(const std::wstring& relPath, const std::wstring& newPa
 
     std::error_code ec;
     fs::path source(AbsolutePath(relPath));
-    fs::path targetParent(AbsolutePath(targetParentRel));
+    fs::path targetParent = targetParentRel.empty() ? fs::path(dataDir_)
+                                                    : fs::path(AbsolutePath(targetParentRel));
     if (!fs::is_directory(source, ec)) {
         error = L"分组不存在";
         return false;
@@ -407,10 +386,6 @@ bool NoteStore::MoveGroup(const std::wstring& relPath, const std::wstring& newPa
 }
 
 bool NoteStore::DeleteGroup(const std::wstring& relPath, std::wstring& error) {
-    if (Lower(relPath) == Lower(defaultGroupPath_)) {
-        error = L"默认分组不能删除";
-        return false;
-    }
     if (!IsSafeRelative(relPath) || relPath.empty()) {
         error = L"分组路径无效";
         return false;
@@ -445,9 +420,10 @@ bool NoteStore::SaveNote(const std::wstring& relPath, const std::wstring& groupR
         return false;
     }
 
-    std::wstring groupPath = groupRel.empty() ? defaultGroupPath_ : groupRel;
+    std::wstring groupPath = groupRel;
     std::error_code ec;
-    fs::path groupDir(AbsolutePath(groupPath));
+    fs::path groupDir = groupPath.empty() ? fs::path(dataDir_)
+                                          : fs::path(AbsolutePath(groupPath));
     if (!fs::is_directory(groupDir, ec)) {
         fs::create_directories(groupDir, ec);
         if (ec) {
@@ -500,8 +476,7 @@ bool NoteStore::MoveNote(const std::wstring& relPath, const std::wstring& newGro
         return false;
     }
 
-    const std::wstring targetGroupRel =
-        newGroupRel.empty() ? defaultGroupPath_ : newGroupRel;
+    const std::wstring targetGroupRel = newGroupRel;
     const std::wstring currentGroupRel = fs::path(relPath).parent_path().wstring();
     if (Lower(targetGroupRel) == Lower(currentGroupRel)) {
         error = L"便签已经在该分组下";
@@ -510,7 +485,8 @@ bool NoteStore::MoveNote(const std::wstring& relPath, const std::wstring& newGro
 
     std::error_code ec;
     fs::path source(AbsolutePath(relPath));
-    fs::path targetGroup(AbsolutePath(targetGroupRel));
+    fs::path targetGroup = targetGroupRel.empty() ? fs::path(dataDir_)
+                                                  : fs::path(AbsolutePath(targetGroupRel));
     if (!fs::is_regular_file(source, ec)) {
         error = L"便签文件不存在";
         return false;

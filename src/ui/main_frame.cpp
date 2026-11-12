@@ -48,8 +48,8 @@ enum {
     ID_CTX_NEW_NOTE,
     ID_CTX_NEW_MARKDOWN_NOTE,
     ID_CTX_NEW_GROUP,
-    ID_CTX_NEW_DEFAULT_NOTE,
-    ID_CTX_NEW_DEFAULT_MARKDOWN_NOTE,
+    ID_CTX_NEW_ROOT_NOTE,
+    ID_CTX_NEW_ROOT_MARKDOWN_NOTE,
     ID_CTX_OPEN,
     ID_CTX_RENAME,
     ID_CTX_MOVE,
@@ -160,8 +160,6 @@ MainFrame::MainFrame(std::shared_ptr<NoteStore> store)
     SetSize(DefaultWindowSize(this));
     SetMinSize(FromDIP(wxSize(320, 540)));
 
-    if (store_) selectedGroupPath_ = store_->DefaultGroupPath();
-
     BuildUi();
     BindEvents();
     if (bottomStatus_) {
@@ -264,7 +262,7 @@ void MainFrame::BuildUi() {
                                      L"新建分组 (Ctrl+Shift+N)：选中分组时在其下新增子分组",
                                      IconButton::Kind::Normal, buttonSize, 12);
     addNoteButton_ = new IconButton(titleBar, ID_NOTE_ADD, AppIcon::NotePlus,
-                                    L"新建普通便签 (Ctrl+N)：未选分组时放入默认分组",
+                                    L"新建普通便签 (Ctrl+N)：未选分组时创建在根目录",
                                     IconButton::Kind::Normal, buttonSize, 12);
     addMarkdownButton_ = new IconButton(titleBar, ID_NOTE_ADD_MARKDOWN, AppIcon::Markdown,
                                         L"新建 Markdown 便签 (Ctrl+M)：编辑原文或切换预览模式",
@@ -784,13 +782,12 @@ bool MainFrame::ChangeDataDirectory(const wxString& newDirValue) {
     }
 
     store_ = newStore;
-    selectedGroupPath_ = store_->DefaultGroupPath();
+    selectedGroupPath_.clear();
     selectedNotePath_.clear();
     expandedGroups_.clear();
     expansionInitialized_ = false;
     LoadData();
     RebuildTree();
-    tree_->SelectItem(NoteTreeCtrl::Kind::Group, selectedGroupPath_);
 
     if (wxConfigBase* config = wxConfigBase::Get()) {
         config->Write("/Data/Directory", FromW(store_->DataDir()));
@@ -841,10 +838,6 @@ void MainFrame::LoadData() {
     if (!store_) return;
 
     std::wstring error;
-    if (!store_->EnsureDefaultGroup(error)) {
-        wxMessageBox(wxString(L"无法创建默认分组：\n") + FromW(error), L"PenDown",
-                     wxOK | wxICON_ERROR, this);
-    }
     if (!store_->ListTree(groups_, notes_, error)) {
         wxMessageBox(wxString(L"读取便签目录失败：\n") + FromW(error), L"PenDown",
                      wxOK | wxICON_ERROR, this);
@@ -891,9 +884,6 @@ void MainFrame::RebuildTree() {
         expansionInitialized_ = true;
     }
 
-    const std::wstring defaultPath = store_ ? store_->DefaultGroupPath() : L"默认分组";
-    const std::wstring defaultLower = LowerText(defaultPath);
-
     std::vector<size_t> roots;
     roots.reserve(groups_.size());
     for (size_t i = 0; i < groups_.size(); ++i) {
@@ -905,9 +895,6 @@ void MainFrame::RebuildTree() {
 
     auto sortGroups = [&](std::vector<size_t>& indices) {
         std::sort(indices.begin(), indices.end(), [&](size_t a, size_t b) {
-            const bool aDefault = groupLowerPaths_[a] == defaultLower;
-            const bool bDefault = groupLowerPaths_[b] == defaultLower;
-            if (aDefault != bDefault) return aDefault;
             return groupLowerNames_[a] < groupLowerNames_[b];
         });
     };
@@ -920,6 +907,22 @@ void MainFrame::RebuildTree() {
 
     std::vector<NoteTreeCtrl::Item> items;
     items.reserve(groups_.size() + notes_.size());
+
+    // 根目录下的便签直接显示为顶层节点。
+    const auto rootNotes = notesByGroup_.find(L"");
+    if (rootNotes != notesByGroup_.end()) {
+        for (size_t noteIndex : rootNotes->second) {
+            const NoteFileEntry& note = notes_[noteIndex];
+            NoteTreeCtrl::Item noteItem;
+            noteItem.kind = NoteTreeCtrl::Kind::Note;
+            noteItem.path = note.rel_path;
+            noteItem.depth = 0;
+            noteItem.text = note.title;
+            noteItem.markdown = note.format == NoteFormat::Markdown;
+            items.push_back(std::move(noteItem));
+        }
+    }
+
     std::function<void(size_t, int)> addGroup = [&](size_t groupIndex, int depth) {
         const NoteGroupEntry& group = groups_[groupIndex];
         const std::wstring& groupLower = groupLowerPaths_[groupIndex];
@@ -981,14 +984,11 @@ void MainFrame::RebuildTree() {
         int groupRow = selectedGroupPath_.empty()
                            ? wxNOT_FOUND
                            : tree_->FindItem(NoteTreeCtrl::Kind::Group, selectedGroupPath_);
-        if (groupRow == wxNOT_FOUND) {
-            selectedGroupPath_ = defaultPath;
-            groupRow = tree_->FindItem(NoteTreeCtrl::Kind::Group, defaultPath);
-        }
         if (groupRow != wxNOT_FOUND) {
             tree_->SetSelection(groupRow);
             tree_->ScrollToRow((size_t)groupRow);
         } else {
+            selectedGroupPath_.clear();
             tree_->SetSelection(wxNOT_FOUND);
         }
     }
@@ -1024,16 +1024,11 @@ void MainFrame::UpdateSelectionState() {
     } else {
         selectedGroupPath_.clear();
         selectedNotePath_.clear();
-        SetBottomStatus(L"未选分组：新便签进入默认分组");
+        SetBottomStatus(L"未选分组：新便签将创建在根目录");
     }
 
     if (deleteButton_) {
-        bool canDelete = !selectedNotePath_.empty();
-        if (!canDelete && !selectedGroupPath_.empty()) {
-            std::wstring defaultPath = store_ ? store_->DefaultGroupPath() : L"默认分组";
-            canDelete = LowerText(selectedGroupPath_) != LowerText(defaultPath);
-        }
-        deleteButton_->Enable(canDelete);
+        deleteButton_->Enable(!selectedNotePath_.empty() || !selectedGroupPath_.empty());
     }
 }
 
@@ -1079,9 +1074,8 @@ void MainFrame::AddNote(NoteFormat format) {
 }
 
 void MainFrame::AddNoteToGroup(const std::wstring& groupPath, NoteFormat format) {
-    std::wstring target = groupPath.empty() ? (store_ ? store_->DefaultGroupPath() : L"默认分组")
-                                            : groupPath;
-    ExpandGroup(target);
+    const std::wstring target = groupPath;
+    if (!target.empty()) ExpandGroup(target);
     RebuildTree();
 
     auto* window = new NoteWindow(
@@ -1136,11 +1130,6 @@ void MainFrame::RenameSelected() {
 void MainFrame::RenameGroup(const std::wstring& groupPath) {
     // groupPath 可能引用 selectedGroupPath_，先复制，避免后面赋值时被改掉。
     const std::wstring targetPath = groupPath;
-    if (LowerText(targetPath) ==
-        LowerText(store_ ? store_->DefaultGroupPath() : L"默认分组")) {
-        wxMessageBox(L"默认分组不能重命名。", L"PenDown", wxOK | wxICON_INFORMATION, this);
-        return;
-    }
     const NoteGroupEntry* target = nullptr;
     for (const NoteGroupEntry& group : groups_) {
         if (group.rel_path == targetPath) {
@@ -1199,10 +1188,6 @@ void MainFrame::RenameGroup(const std::wstring& groupPath) {
 
 void MainFrame::MoveToGroup(NoteTreeCtrl::Kind kind, const std::wstring& path) {
     if (!store_) return;
-    if (kind == NoteTreeCtrl::Kind::Group &&
-        LowerText(path) == LowerText(store_->DefaultGroupPath())) {
-        return;
-    }
 
     const NoteFileEntry* note = nullptr;
     std::wstring currentGroup;
@@ -1216,6 +1201,12 @@ void MainFrame::MoveToGroup(NoteTreeCtrl::Kind kind, const std::wstring& path) {
 
     std::vector<std::wstring> targets;
     wxArrayString labels;
+    if (!currentGroup.empty()) {
+        // 不选上级：分组放到根；便签放到根目录。
+        targets.push_back(std::wstring());
+        labels.Add(kind == NoteTreeCtrl::Kind::Group ? L"不选上级（根分组）"
+                                                     : L"不选分组（根目录）");
+    }
     for (const NoteGroupEntry& group : groups_) {
         if (kind == NoteTreeCtrl::Kind::Group) {
             if (HasPathPrefix(group.rel_path, path)) continue;  // 自己和自己的子分组
@@ -1313,12 +1304,6 @@ void MainFrame::DeleteGroup(const std::wstring& groupPath) {
     // groupPath 可能是 selectedGroupPath_ 的引用，后面会改 selectedGroupPath_，
     // 必须先复制，否则删除目标会变成父分组。
     const std::wstring targetPath = groupPath;
-    if (LowerText(targetPath) ==
-        LowerText(store_ ? store_->DefaultGroupPath() : L"默认分组")) {
-        wxMessageBox(L"默认分组不能删除。", L"PenDown", wxOK | wxICON_INFORMATION, this);
-        return;
-    }
-
     std::set<std::wstring> subtree;
     CollectGroupTree(targetPath, subtree);
     int answer = wxMessageBox(
@@ -1337,12 +1322,13 @@ void MainFrame::DeleteGroup(const std::wstring& groupPath) {
 
     for (const std::wstring& path : subtree) expandedGroups_.erase(path);
     std::wstring parent = GroupParent(targetPath);
-    selectedGroupPath_ =
-        parent.empty() ? (store_ ? store_->DefaultGroupPath() : L"默认分组") : parent;
+    selectedGroupPath_ = parent;
     selectedNotePath_.clear();
     RemoveGroupSubtreeFromModel(targetPath);
     RebuildTree();
-    tree_->SelectItem(NoteTreeCtrl::Kind::Group, selectedGroupPath_);
+    if (!selectedGroupPath_.empty()) {
+        tree_->SelectItem(NoteTreeCtrl::Kind::Group, selectedGroupPath_);
+    }
 }
 
 void MainFrame::DeleteNote(const std::wstring& notePath) {
@@ -1390,8 +1376,8 @@ void MainFrame::OnTreeContext(bool hasItem, NoteTreeCtrl::Kind kind,
     wxMenu menu;
     if (!hasItem) {
         menu.Append(ID_CTX_NEW_GROUP, L"新建分组");
-        menu.Append(ID_CTX_NEW_DEFAULT_NOTE, L"新建普通便签（默认分组）");
-        menu.Append(ID_CTX_NEW_DEFAULT_MARKDOWN_NOTE, L"新建 Markdown 便签（默认分组）");
+        menu.Append(ID_CTX_NEW_ROOT_NOTE, L"新建普通便签（根目录）");
+        menu.Append(ID_CTX_NEW_ROOT_MARKDOWN_NOTE, L"新建 Markdown 便签（根目录）");
     } else if (kind == NoteTreeCtrl::Kind::Group) {
         menu.Append(ID_CTX_NEW_SUBGROUP, L"新建子分组");
         menu.Append(ID_CTX_NEW_NOTE, L"在此分组新建普通便签");
@@ -1400,11 +1386,6 @@ void MainFrame::OnTreeContext(bool hasItem, NoteTreeCtrl::Kind kind,
         menu.Append(ID_CTX_RENAME, L"重命名分组");
         menu.Append(ID_CTX_MOVE, L"移动到分组...");
         menu.Append(ID_CTX_DELETE, L"删除分组");
-        if (LowerText(path) == LowerText(store_ ? store_->DefaultGroupPath() : L"默认分组")) {
-            menu.Enable(ID_CTX_RENAME, false);
-            menu.Enable(ID_CTX_MOVE, false);
-            menu.Enable(ID_CTX_DELETE, false);
-        }
     } else {
         menu.Append(ID_CTX_OPEN, L"打开便签");
         menu.Append(ID_CTX_MOVE, L"移动到分组...");
@@ -1417,13 +1398,11 @@ void MainFrame::OnTreeContext(bool hasItem, NoteTreeCtrl::Kind kind,
         case ID_CTX_NEW_GROUP:
             AddGroupUnder(L"");
             break;
-        case ID_CTX_NEW_DEFAULT_NOTE:
-            AddNoteToGroup(store_ ? store_->DefaultGroupPath() : L"默认分组",
-                           NoteFormat::RichText);
+        case ID_CTX_NEW_ROOT_NOTE:
+            AddNoteToGroup(L"", NoteFormat::RichText);
             break;
-        case ID_CTX_NEW_DEFAULT_MARKDOWN_NOTE:
-            AddNoteToGroup(store_ ? store_->DefaultGroupPath() : L"默认分组",
-                           NoteFormat::Markdown);
+        case ID_CTX_NEW_ROOT_MARKDOWN_NOTE:
+            AddNoteToGroup(L"", NoteFormat::Markdown);
             break;
         case ID_CTX_NEW_SUBGROUP:
             AddGroupUnder(path);
@@ -1468,10 +1447,9 @@ void MainFrame::OnNoteSaved(const std::wstring& oldPath, const std::wstring& not
     }
 
     if (indexesDirty_) RebuildIndexes();
-    const std::wstring defaultGroup =
-        store_ ? store_->DefaultGroupPath() : L"默认分组";
-    const std::wstring resolvedGroup = groupPath.empty() ? defaultGroup : groupPath;
-    if (groupIndex_.find(LowerText(resolvedGroup)) == groupIndex_.end()) {
+    const std::wstring resolvedGroup = groupPath;
+    if (!resolvedGroup.empty() &&
+        groupIndex_.find(LowerText(resolvedGroup)) == groupIndex_.end()) {
         // 分组不在当前模型中，走一次完整刷新，避免把便签挂到错误位置
         LoadData();
         ExpandGroup(resolvedGroup);
@@ -1513,8 +1491,7 @@ void MainFrame::OnNoteSaved(const std::wstring& oldPath, const std::wstring& not
 
 void MainFrame::OnNoteDeleted(const std::wstring& notePath, const std::wstring& groupPath) {
     (void)notePath;
-    selectedGroupPath_ =
-        groupPath.empty() ? (store_ ? store_->DefaultGroupPath() : L"默认分组") : groupPath;
+    selectedGroupPath_ = groupPath;
     selectedNotePath_.clear();
 
     const std::wstring removed = LowerText(notePath);
@@ -1538,9 +1515,8 @@ void MainFrame::OnNoteWindowClosed(NoteWindow* window) {
 }
 
 std::wstring MainFrame::ResolveNewNoteGroup() const {
-    // 需求：只有明确选中分组时才使用它；选中便签或空白处都放入默认分组
-    if (!selectedGroupPath_.empty()) return selectedGroupPath_;
-    return store_ ? store_->DefaultGroupPath() : L"默认分组";
+    // 只有明确选中分组时才使用它；选中便签或空白处都创建在根目录。
+    return selectedGroupPath_;
 }
 
 std::wstring MainFrame::GroupParent(const std::wstring& groupPath) const {
@@ -1551,7 +1527,7 @@ std::wstring MainFrame::GroupParent(const std::wstring& groupPath) const {
 
 std::wstring MainFrame::GroupName(const std::wstring& groupPath) const {
     const auto found = groupIndex_.find(LowerText(groupPath));
-    if (found == groupIndex_.end() || found->second >= groups_.size()) return L"默认分组";
+    if (found == groupIndex_.end() || found->second >= groups_.size()) return groupPath;
     return groups_[found->second].name;
 }
 
@@ -1586,11 +1562,14 @@ void MainFrame::RemoveGroupSubtreeFromModel(const std::wstring& groupPath) {
 void MainFrame::ReplaceGroupPrefixInModel(const std::wstring& oldPath,
                                           const std::wstring& newPath) {
     if (oldPath == newPath) return;
+    const std::wstring newParent = fs::path(newPath).parent_path().wstring();
     for (NoteGroupEntry& group : groups_) {
+        const bool movedRoot = LowerText(group.rel_path) == LowerText(oldPath);
         if (HasPathPrefix(group.rel_path, oldPath)) {
             group.rel_path = ReplacePathPrefix(group.rel_path, oldPath, newPath);
-            if (LowerText(group.rel_path) == LowerText(newPath)) {
+            if (movedRoot) {
                 group.name = fs::path(newPath).filename().wstring();
+                group.parent_path = newParent;
             }
         }
         if (HasPathPrefix(group.parent_path, oldPath)) {

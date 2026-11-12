@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-// 文件系统里的一个分组目录。rel_path 相对 data 目录，例如「默认分组/工作」。
+// 文件系统里的一个分组目录。rel_path 相对 data 目录，例如「工作/项目 A」。
 struct NoteGroupEntry {
     std::wstring rel_path;
     std::wstring parent_path;
@@ -31,9 +31,7 @@ public:
     bool Open(const std::wstring& dataDir, std::wstring& error);
 
     const std::wstring& DataDir() const { return dataDir_; }
-    const std::wstring& DefaultGroupPath() const { return defaultGroupPath_; }
 
-    bool EnsureDefaultGroup(std::wstring& error);
     bool ListTree(std::vector<NoteGroupEntry>& groups, std::vector<NoteFileEntry>& notes,
                   std::wstring& error) const;
 
@@ -61,5 +59,4 @@ private:
     std::wstring AbsolutePath(const std::wstring& relPath) const;
 
     std::wstring dataDir_;
-    std::wstring defaultGroupPath_;
 };

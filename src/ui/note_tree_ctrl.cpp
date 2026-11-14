@@ -137,8 +137,7 @@ void NoteTreeCtrl::OnDrawItem(wxDC& dc, const wxRect& rect, size_t n) const {
         const wxColour& iconColour =
             IsSelected(n) ? Theme::TextMuted() : Theme::TextFaint();
         const wxBitmap& note =
-            CachedIcon(item.markdown ? AppIcon::Markdown : AppIcon::Note,
-                       iconSize, iconColour);
+            CachedIcon(AppIcon::Note, iconSize, iconColour);
         if (note.IsOk()) dc.DrawBitmap(note, IconX(item), iconY, true);
         dc.SetTextForeground(Theme::Text());
     }

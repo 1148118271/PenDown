@@ -10,7 +10,6 @@ int AppFont::basePointSize_ = 0;
 namespace {
 
 std::map<std::tuple<int, bool, bool, bool>, wxFont> g_fontCache;
-std::map<int, wxFont> g_monoCache;
 
 }  // namespace
 
@@ -43,18 +42,6 @@ wxFont AppFont::Make(int pointSize, bool bold, bool italic, bool underline) {
     font.SetStyle(italic ? wxFONTSTYLE_ITALIC : wxFONTSTYLE_NORMAL);
     font.SetUnderlined(underline);
     g_fontCache.emplace(key, font);
-    return font;
-}
-
-wxFont AppFont::Mono(int pointSize) {
-    EnsureDefaults();
-    if (pointSize <= 0) pointSize = basePointSize_;
-
-    const auto found = g_monoCache.find(pointSize);
-    if (found != g_monoCache.end()) return found->second;
-
-    wxFont font = wxFont(wxFontInfo(pointSize).Family(wxFONTFAMILY_TELETYPE));
-    g_monoCache.emplace(pointSize, font);
     return font;
 }
 

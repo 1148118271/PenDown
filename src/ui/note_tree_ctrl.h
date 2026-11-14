@@ -31,7 +31,6 @@ public:
         int count = 0;
         bool expanded = false;
         bool hasChildren = false;
-        bool markdown = false;
     };
 
     using SelectionHandler = std::function<void()>;

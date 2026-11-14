@@ -4,10 +4,14 @@
 
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
+#include <sstream>
 #include <string>
 #include <vector>
 
 #include "core/note_store.h"
+#include "core/note_storage.h"
+#include "core/style_model.h"
 
 namespace fs = std::filesystem;
 
@@ -82,11 +86,11 @@ bool RunSelfTest(const std::wstring& reportPath) {
         check(notes.empty(), L"initial notes empty");
 
         std::wstring rootNote;
-        std::wstring rootMarkdown = L"# 根便签\n\n根目录内容";
-        check(store.SaveNote(L"", L"", ToUtf8(rootMarkdown), L"根便签",
-                             NoteFormat::Markdown, rootNote, error),
+        std::wstring rootMarkdown = L"根便签\n\n根目录内容";
+        check(store.SaveNote(L"", L"", ToUtf8(rootMarkdown), L"根便签", rootNote,
+                             error),
               L"create root note");
-        check(rootNote == L"根便签.md", L"root note path");
+        check(rootNote == L"根便签.txt", L"root note path");
         check(fs::is_regular_file(dataDir / rootNote), L"root note file exists");
         std::string rootBytes;
         check(store.ReadNote(rootNote, rootBytes, error) &&
@@ -96,6 +100,31 @@ bool RunSelfTest(const std::wstring& reportPath) {
               L"list root note");
         check(!notes.empty() && notes[0].group_path.empty(), L"root note has no group");
         check(NoteStore::DeriveTitle(rootMarkdown) == L"根便签", L"derive root title");
+
+        std::wstring caseNotePath;
+        check(store.SaveNote(L"", L"", ToUtf8(rootMarkdown), L"CaseNote",
+                             caseNotePath, error),
+              L"create case note");
+        std::wstring caseNoteRenamed;
+        check(store.SaveNote(caseNotePath, L"", ToUtf8(rootMarkdown), L"casenote",
+                             caseNoteRenamed, error),
+              L"rename case-only note");
+        check(fs::path(caseNoteRenamed).filename().wstring() == L"casenote.txt",
+              L"case-only note on disk");
+        check(store.DeleteNote(caseNoteRenamed, error), L"delete case note");
+
+        std::wstring caseGroup;
+        check(store.CreateGroup(L"", L"CaseGroup", caseGroup, error),
+              L"create case group");
+        std::wstring caseRenamed;
+        check(store.RenameGroup(caseGroup, L"casegroup", caseRenamed, error),
+              L"rename case-only group");
+        bool caseExact = false;
+        for (const fs::directory_entry& entry : fs::directory_iterator(dataDir)) {
+            if (entry.path().filename().wstring() == L"casegroup") caseExact = true;
+        }
+        check(caseExact, L"case-only group on disk");
+        check(store.DeleteGroup(caseRenamed, error), L"delete case group");
 
         std::wstring workRel;
         check(store.CreateGroup(L"", L"工作", workRel, error), L"create root group");
@@ -109,37 +138,168 @@ bool RunSelfTest(const std::wstring& reportPath) {
         check(store.ListTree(groups, notes, error) && groups.size() == 2,
               L"list two groups");
 
-        std::wstring markdown = L"# 第四季度汇报\n\n- 补充数据\n- 核对口径";
+        std::wstring markdown = L"第四季度汇报\n\n补充数据\n核对口径";
         std::wstring notePath;
         check(store.SaveNote(L"", projectRel, ToUtf8(markdown), L"第四季度汇报",
-                             NoteFormat::Markdown, notePath, error),
-              L"create markdown note");
-        check(notePath == L"工作\\项目 A\\第四季度汇报.md", L"markdown note path");
-        check(EndsWith(notePath, L".md"), L"markdown extension");
-        check(fs::is_regular_file(dataDir / notePath), L"markdown file exists");
+                             notePath, error),
+              L"create text note");
+        check(notePath == L"工作\\项目 A\\第四季度汇报.txt", L"text note path");
+        check(EndsWith(notePath, L".txt"), L"text extension");
+        check(fs::is_regular_file(dataDir / notePath), L"text file exists");
 
         std::string bytes;
         check(store.ReadNote(notePath, bytes, error) && FromUtf8(bytes) == markdown,
-              L"markdown roundtrip");
-        check(NoteStore::DeriveTitle(markdown) == L"第四季度汇报", L"derive heading title");
-        check(NoteStore::DeriveTitle(L"- 第一项\n第二行") == L"第一项", L"derive list title");
+              L"text roundtrip");
+        check(NoteStore::DeriveTitle(markdown) == L"第四季度汇报", L"derive plain title");
+        check(NoteStore::DeriveTitle(L"- 第一项\n第二行") == L"- 第一项",
+              L"derive literal first line");
+        check(NoteStore::DeriveTitle(
+                  L"<span style=\"color:#E45649\">彩色标题</span>") ==
+                  L"<span style=\"color:#E45649\">彩色标题</span>",
+              L"derive literal colour line");
         check(NoteStore::DeriveTitle(L"") == L"无标题便签", L"empty title");
+
+        // 样式 sidecar 的保存/加载/删除。
+        StyleModel styled;
+        TextStyle red;
+        red.foreground = "#E45649";
+        red.bold = true;
+        const uint32_t redId = styled.Intern(red);
+        styled.SetRange(0, 3, redId);
+        // 链接地址单独保存，不占样式槽；两个不同 URL 共用同一个样式。
+        TextStyle linkStyle = red;
+        linkStyle.foreground = "#2563EB";
+        linkStyle.underline = true;
+        const uint32_t linkId = styled.Intern(linkStyle);
+        styled.SetRange(3, 9, linkId);
+        styled.Links().SetRange(3, 6, "https://example.com");
+        styled.Links().SetRange(6, 9, "https://second.example");
+        std::wstring styledPath;
+        check(store.SaveNote(L"", L"", ToUtf8(L"红色标题\n正文"), L"样式便签",
+                             styled, styledPath, error),
+              L"create styled note");
+        std::wstring styledJson =
+            std::wstring(NoteStorage::StylePath(dataDir.wstring() + L"\\" +
+                                                styledPath));
+        check(fs::is_regular_file(styledJson), L"style sidecar exists");
+        StyleModel loadedStyles;
+        std::wstring styleWarning;
+        std::string styledText;
+        check(store.LoadNoteDocument(styledPath, styledText, loadedStyles,
+                                     styleWarning, error) &&
+                  FromUtf8(styledText) == L"红色标题\n正文" &&
+                  !loadedStyles.Empty() &&
+                  loadedStyles.GetStyle(loadedStyles.StyleIdAt(0)).foreground ==
+                      "#E45649" &&
+                  loadedStyles.Links().UrlAt(3) == "https://example.com" &&
+                  loadedStyles.Links().UrlAt(7) == "https://second.example" &&
+                  loadedStyles.StyleCount() == 3,
+              L"style and link roundtrip");
+        // 新格式把链接写在独立的 links 数组里，样式表里不再有 url。
+        std::string styledJsonText;
+        check(NoteStorage::ReadTextFile(styledJson, styledJsonText, error) &&
+                  styledJsonText.find("\"links\"") != std::string::npos &&
+                  styledJsonText.find("\"url\"") == std::string::npos,
+              L"style json stores links separately");
+
+        // 旧格式的 url 保存在样式表里；加载时应迁移成独立链接区间。
+        const std::string legacyText = ToUtf8(L"红色标题\n正文");
+        std::ostringstream legacyHash;
+        legacyHash << std::hex << std::setw(16) << std::setfill('0')
+                   << NoteStorage::HashText(legacyText);
+        std::ostringstream legacyJson;
+        legacyJson << "{\"version\":1,\"body\":{\"length\":"
+                   << legacyText.size() << ",\"hash\":\"" << legacyHash.str()
+                   << "\"},\"styles\":[{\"fg\":\"#E45649\","
+                      "\"url\":\"https://old.example\"},"
+                      "{\"b\":true,\"url\":\"https://old2.example\"}],"
+                      "\"runs\":[[0,3,1],[3,9,2]]}";
+        const fs::path legacyBody = dataDir / L"旧格式链接.txt";
+        const fs::path legacyStyle =
+            NoteStorage::StylePath(legacyBody.wstring());
+        StyleModel migrated;
+        std::wstring migratedWarning;
+        std::string migratedText;
+        check(NoteStorage::WriteTextFile(legacyBody.wstring(), legacyText,
+                                         error) &&
+                  NoteStorage::WriteTextFile(legacyStyle.wstring(),
+                                             legacyJson.str(), error) &&
+                  NoteStorage::Load(legacyBody.wstring(), migratedText, migrated,
+                                    migratedWarning) &&
+                  migrated.Links().UrlAt(1) == "https://old.example" &&
+                  migrated.Links().UrlAt(4) == "https://old2.example" &&
+                  !migrated.StyleAt(0).bold && migrated.StyleAt(3).bold,
+              L"legacy url migrates to links");
+        std::error_code legacyIgnored;
+        fs::remove(legacyBody, legacyIgnored);
+        fs::remove(legacyStyle, legacyIgnored);
+
+        // 旧文件里两个只差 URL 的样式，迁移后应合并成同一个样式槽。
+        std::ostringstream duplicateJson;
+        duplicateJson << "{\"version\":1,\"body\":{\"length\":"
+                      << legacyText.size() << ",\"hash\":\""
+                      << legacyHash.str()
+                      << "\"},\"styles\":[{\"fg\":\"#2563EB\",\"u\":true,"
+                         "\"url\":\"https://a.example\"},"
+                         "{\"fg\":\"#2563EB\",\"u\":true,"
+                         "\"url\":\"https://b.example\"}],"
+                         "\"runs\":[[0,3,1],[3,6,2]]}";
+        const fs::path duplicateBody = dataDir / L"旧格式重复样式.txt";
+        const fs::path duplicateStyle =
+            NoteStorage::StylePath(duplicateBody.wstring());
+        StyleModel deduped;
+        std::wstring dedupedWarning;
+        std::string dedupedText;
+        check(NoteStorage::WriteTextFile(duplicateBody.wstring(), legacyText,
+                                         error) &&
+                  NoteStorage::WriteTextFile(duplicateStyle.wstring(),
+                                             duplicateJson.str(), error) &&
+                  NoteStorage::Load(duplicateBody.wstring(), dedupedText,
+                                    deduped, dedupedWarning) &&
+                  deduped.Links().UrlAt(0) == "https://a.example" &&
+                  deduped.Links().UrlAt(3) == "https://b.example" &&
+                  deduped.StyleCount() == 2 &&
+                  deduped.StyleIdAt(0) == deduped.StyleIdAt(3),
+              L"legacy duplicate styles dedupe");
+        fs::remove(duplicateBody, legacyIgnored);
+        fs::remove(duplicateStyle, legacyIgnored);
+
+        std::wstring renamedStyled;
+        check(store.SaveNote(styledPath, L"", ToUtf8(L"新样式\n正文"),
+                             L"新样式便签", styled, renamedStyled, error),
+              L"rename styled note");
+        check(renamedStyled != styledPath && !fs::exists(styledJson),
+              L"old style sidecar removed");
+        styledPath = renamedStyled;
+        std::wstring renamedJson =
+            NoteStorage::StylePath(dataDir.wstring() + L"\\" + styledPath);
+        check(fs::is_regular_file(renamedJson), L"renamed style sidecar");
+        styledJson = renamedJson;
+        std::wstring movedStyled;
+        check(store.MoveNote(styledPath, projectRel, movedStyled, error),
+              L"move styled note");
+        check(fs::is_regular_file(dataDir /
+                                  (movedStyled + L".style.json")),
+              L"style sidecar moved");
+        check(store.MoveNote(movedStyled, L"", styledPath, error),
+              L"move styled note back");
+        check(store.DeleteNote(styledPath, error), L"delete styled note");
+        check(!fs::exists(styledJson), L"style sidecar removed");
 
         check(store.ListTree(groups, notes, error) && notes.size() == 2,
               L"list root and group notes");
         bool projectFound = false;
         for (const NoteFileEntry& note : notes) {
-            if (note.rel_path == notePath && note.title == L"第四季度汇报" &&
-                note.format == NoteFormat::Markdown) {
+            if (note.rel_path == notePath && note.title == L"第四季度汇报") {
                 projectFound = true;
             }
         }
         check(projectFound, L"note title and format in tree");
 
         std::wstring renamedPath;
-        std::wstring changed = L"## 新标题\n\n新的正文";
+        std::wstring changed = L"新标题\n\n新的正文";
         check(store.SaveNote(notePath, projectRel, ToUtf8(changed), L"新标题",
-                             NoteFormat::Markdown, renamedPath, error),
+                             renamedPath, error),
               L"rename note by first line");
         check(renamedPath != notePath, L"note path changed");
         check(!fs::exists(dataDir / notePath), L"old note file removed");
@@ -147,29 +307,20 @@ bool RunSelfTest(const std::wstring& reportPath) {
 
         std::wstring duplicatePath;
         check(store.SaveNote(L"", projectRel, ToUtf8(changed), L"新标题",
-                             NoteFormat::Markdown, duplicatePath, error),
+                             duplicatePath, error),
               L"save duplicate title");
         check(duplicatePath != renamedPath, L"duplicate title unique");
         check(store.DeleteNote(duplicatePath, error), L"delete duplicate note");
 
-        std::wstring richPath;
-        std::wstring richXml =
-            L"<richtext version=\"1.0\"><paragraph><text>普通文本便签</text></paragraph></richtext>";
-        check(store.SaveNote(L"", workRel, ToUtf8(richXml), L"普通文本便签",
-                             NoteFormat::RichText, richPath, error),
-              L"create rich text note");
-        check(richPath == L"工作\\普通文本便签.wxr", L"rich text note path");
-        check(EndsWith(richPath, L".wxr"), L"rich text extension");
-        check(fs::is_regular_file(dataDir / richPath), L"rich text file exists");
-        check(store.ListTree(groups, notes, error) && notes.size() == 3,
-              L"list markdown and rich text");
-        bool richFound = false;
-        for (const NoteFileEntry& note : notes) {
-            if (note.rel_path == richPath && note.format == NoteFormat::RichText) {
-                richFound = true;
-            }
+        // 旧版 .wxr 不再作为便签列出，但文件本身必须保留。
+        const fs::path legacyRich = dataDir / L"工作" / L"旧版便签.wxr";
+        {
+            std::ofstream legacy(legacyRich, std::ios::binary | std::ios::trunc);
+            legacy << "legacy";
         }
-        check(richFound, L"rich text format in tree");
+        check(fs::is_regular_file(legacyRich), L"legacy wxr preserved");
+        check(store.ListTree(groups, notes, error) && notes.size() == 2,
+              L"legacy wxr ignored");
 
         std::wstring renamedGroup;
         check(store.RenameGroup(projectRel, L"项目 B", renamedGroup, error),
@@ -177,13 +328,13 @@ bool RunSelfTest(const std::wstring& reportPath) {
         check(renamedGroup == L"工作\\项目 B", L"renamed group path");
         check(fs::is_directory(dataDir / renamedGroup), L"renamed group folder exists");
         check(!fs::exists(dataDir / renamedPath), L"old note path no longer present");
-        check(store.ListTree(groups, notes, error) && notes.size() == 3,
+        check(store.ListTree(groups, notes, error) && notes.size() == 2,
               L"notes moved with group");
         renamedPath = renamedGroup + renamedPath.substr(projectRel.size());
 
         std::wstring movedNote;
         check(store.MoveNote(renamedPath, workRel, movedNote, error), L"move note");
-        check(movedNote == L"工作\\新标题.md", L"moved note path");
+        check(movedNote == L"工作\\新标题.txt", L"moved note path");
         check(!fs::exists(dataDir / renamedPath) &&
                   fs::is_regular_file(dataDir / movedNote),
               L"moved note file");
@@ -203,7 +354,6 @@ bool RunSelfTest(const std::wstring& reportPath) {
               L"move group back");
         check(fs::is_directory(dataDir / renamedGroup), L"group back folder");
 
-        check(store.DeleteNote(richPath, error), L"delete rich text note");
         check(store.DeleteGroup(workRel, error), L"delete group tree");
         check(!fs::exists(dataDir / workRel), L"group folder removed");
         check(store.DeleteNote(rootNote, error), L"delete root note");

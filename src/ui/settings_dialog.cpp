@@ -208,7 +208,6 @@ void HotkeyCtrl::HandleKey(wxKeyEvent& event) {
 SettingsDialog::SettingsDialog(wxWindow* parent, const wxString& dataDir,
                                const wxString& showMainHotkey,
                                const wxString& newNoteHotkey,
-                               const wxString& newMarkdownHotkey,
                                const GitSyncConfig& gitConfig,
                                std::function<bool()> hasOpenNotes)
     : wxDialog(parent, wxID_ANY, L"设置", wxDefaultPosition, wxDefaultSize,
@@ -262,8 +261,8 @@ SettingsDialog::SettingsDialog(wxWindow* parent, const wxString& dataDir,
 
     addHeading(L"Git 同步");
 
-    addHint(L"data 目录整体作为一个 Git 项目：所有分组、普通便签、"
-            L"Markdown 便签和其他文件都会一起同步。\n"
+    addHint(L"data 目录整体作为一个 Git 项目：所有分组、便签和其他文件"
+            L"都会一起同步。\n"
             L"推送：提交本地改动后强制推送，远程以本地为准；\n"
             L"拉取：先自动备份本地数据，再用远程内容强制覆盖本地。\n"
             L"不做冲突合并。同步前请关闭所有便签窗口。");
@@ -389,8 +388,7 @@ SettingsDialog::SettingsDialog(wxWindow* parent, const wxString& dataDir,
     };
 
     addHotkeyRow(L"显示主窗口", showMain_, showMainHotkey);
-    addHotkeyRow(L"新建普通便签", newNote_, newNoteHotkey);
-    addHotkeyRow(L"新建 Markdown 便签", newMarkdown_, newMarkdownHotkey);
+    addHotkeyRow(L"新建便签", newNote_, newNoteHotkey);
 
     error_ = new wxStaticText(scroller_, wxID_ANY, wxEmptyString);
     error_->SetForegroundColour(Theme::Danger());
@@ -515,10 +513,6 @@ wxString SettingsDialog::NewNoteHotkey() const {
     return newNote_ ? newNote_->RawHotkey() : wxString();
 }
 
-wxString SettingsDialog::NewMarkdownHotkey() const {
-    return newMarkdown_ ? newMarkdown_->RawHotkey() : wxString();
-}
-
 GitSyncConfig SettingsDialog::CurrentGitConfig() const {
     GitSyncConfig config;
     const auto read = [](wxTextCtrl* field) {
@@ -578,10 +572,9 @@ void SettingsDialog::OnSave(wxCommandEvent&) {
 
     const wxString showMain = ShowMainHotkey();
     const wxString newNote = NewNoteHotkey();
-    const wxString newMarkdown = NewMarkdownHotkey();
 
     HotkeySpec spec;
-    const wxString values[] = {showMain, newNote, newMarkdown};
+    const wxString values[] = {showMain, newNote};
     for (const wxString& value : values) {
         if (!ParseHotkey(value, spec)) {
             ShowError(L"快捷键格式无效，请重新录入。");
@@ -592,8 +585,7 @@ void SettingsDialog::OnSave(wxCommandEvent&) {
     auto same = [](const wxString& a, const wxString& b) {
         return !a.empty() && a.IsSameAs(b, false);
     };
-    if (same(showMain, newNote) || same(showMain, newMarkdown) ||
-        same(newNote, newMarkdown)) {
+    if (same(showMain, newNote)) {
         ShowError(L"不同操作不能使用相同的快捷键。");
         return;
     }

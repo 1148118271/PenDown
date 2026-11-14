@@ -1,11 +1,12 @@
 #include "core/note_store.h"
 
+#include "core/note_storage.h"
+
 #include <windows.h>
 
 #include <algorithm>
 #include <cwctype>
 #include <filesystem>
-#include <fstream>
 #include <functional>
 #include <system_error>
 #include <utility>
@@ -36,56 +37,44 @@ bool SamePath(const fs::path& a, const fs::path& b) {
     return Lower(a.lexically_normal().wstring()) == Lower(b.lexically_normal().wstring());
 }
 
+// Windows 文件名不区分大小写，直接 fs::rename("Work", "work") 不会改变大小写；
+// 用临时名做两步重命名，保证大小写修改也能落盘。
+bool RenamePath(const fs::path& source, const fs::path& target, std::wstring& error) {
+    if (source.filename() == target.filename()) return true;
+    std::error_code ec;
+    if (!SamePath(source, target)) {
+        fs::rename(source, target, ec);
+        if (ec) {
+            error = L"重命名失败：" + target.wstring();
+            return false;
+        }
+        return true;
+    }
+
+    fs::path temp = source.parent_path() /
+                    (source.filename().wstring() + L".pendown-rn-" +
+                     std::to_wstring(GetTickCount64()));
+    fs::rename(source, temp, ec);
+    if (ec) {
+        error = L"重命名失败：" + source.wstring();
+        return false;
+    }
+    fs::rename(temp, target, ec);
+    if (ec) {
+        std::error_code ignored;
+        fs::rename(temp, source, ignored);
+        error = L"重命名失败：" + target.wstring();
+        return false;
+    }
+    return true;
+}
+
 bool IsSafeRelative(const std::wstring& relPath) {
     if (relPath.empty()) return true;
     fs::path path(relPath);
     if (path.is_absolute() || path.has_root_name() || path.has_root_directory()) return false;
     for (const fs::path& part : path) {
         if (part == L"..") return false;
-    }
-    return true;
-}
-
-bool ReadAllBytes(const fs::path& path, std::string& bytes, std::wstring& error) {
-    std::ifstream file(path, std::ios::binary);
-    if (!file) {
-        error = L"无法读取便签文件：" + path.wstring();
-        return false;
-    }
-    bytes.assign((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-    if (bytes.size() >= 3 && (unsigned char)bytes[0] == 0xEF &&
-        (unsigned char)bytes[1] == 0xBB && (unsigned char)bytes[2] == 0xBF) {
-        bytes.erase(0, 3);
-    }
-    return true;
-}
-
-bool WriteAllBytes(const fs::path& path, const std::string& bytes, std::wstring& error) {
-    fs::path temp = path;
-    temp += L".tmp";
-
-    {
-        std::ofstream file(temp, std::ios::binary | std::ios::trunc);
-        if (!file) {
-            error = L"无法写入便签文件：" + path.wstring();
-            return false;
-        }
-        file.write(bytes.data(), (std::streamsize)bytes.size());
-        file.flush();
-        if (!file.good()) {
-            error = L"写入便签文件失败：" + path.wstring();
-            file.close();
-            std::error_code ignored;
-            fs::remove(temp, ignored);
-            return false;
-        }
-    }
-
-    if (!MoveFileExW(temp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING)) {
-        error = L"保存便签文件失败：" + path.wstring();
-        std::error_code ignored;
-        fs::remove(temp, ignored);
-        return false;
     }
     return true;
 }
@@ -100,27 +89,6 @@ std::wstring UniqueName(const fs::path& directory, const std::wstring& base,
         if (!fs::exists(candidate)) return name;
     }
     return base + L" (" + std::to_wstring(GetTickCount64()) + L")";
-}
-
-std::wstring StripInlineMarkdown(std::wstring text) {
-    const std::wstring markers[] = {L"**", L"__", L"~~", L"`"};
-    for (const std::wstring& marker : markers) {
-        size_t pos = 0;
-        while ((pos = text.find(marker, pos)) != std::wstring::npos) {
-            text.erase(pos, marker.size());
-        }
-    }
-    size_t pos = 0;
-    while ((pos = text.find(L"[", pos)) != std::wstring::npos) {
-        size_t labelEnd = text.find(L"](", pos + 1);
-        if (labelEnd == std::wstring::npos) break;
-        size_t urlEnd = text.find(L")", labelEnd + 2);
-        if (urlEnd == std::wstring::npos) break;
-        std::wstring label = text.substr(pos + 1, labelEnd - pos - 1);
-        text.replace(pos, urlEnd - pos + 1, label);
-        pos += label.size();
-    }
-    return text;
 }
 
 bool IsReservedFileName(const std::wstring& name) {
@@ -215,21 +183,12 @@ bool NoteStore::ListTree(std::vector<NoteGroupEntry>& groups, std::vector<NoteFi
             }
 
             if (!entry.is_regular_file(entryError)) continue;
-            std::wstring extension = Lower(entry.path().extension().wstring());
-            NoteFormat format = NoteFormat::Markdown;
-            if (extension == L".md") {
-                format = NoteFormat::Markdown;
-            } else if (extension == L".wxr") {
-                format = NoteFormat::RichText;
-            } else {
-                continue;
-            }
+            if (Lower(entry.path().extension().wstring()) != L".txt") continue;
 
             ScannedNote note;
             note.entry.rel_path = JoinRelative(relDir, name);
             note.entry.group_path = relDir;
             note.entry.title = entry.path().stem().wstring();
-            note.entry.format = format;
             note.modified = entry.last_write_time(entryError);
             scannedNotes.push_back(std::move(note));
         }
@@ -319,13 +278,7 @@ bool NoteStore::RenameGroup(const std::wstring& relPath, const std::wstring& new
         error = L"同名分组已存在";
         return false;
     }
-    if (!SamePath(current, target)) {
-        fs::rename(current, target, ec);
-        if (ec) {
-            error = L"重命名分组失败：" + target.wstring();
-            return false;
-        }
-    }
+    if (!RenamePath(current, target, error)) return false;
 
     std::wstring parentRel = fs::path(relPath).parent_path().wstring();
     newRel = JoinRelative(parentRel, clean);
@@ -408,19 +361,40 @@ bool NoteStore::ReadNote(const std::wstring& relPath, std::string& bytes,
         error = L"便签路径无效";
         return false;
     }
-    return ReadAllBytes(fs::path(AbsolutePath(relPath)), bytes, error);
+    return NoteStorage::ReadTextFile(AbsolutePath(relPath), bytes, error);
+}
+
+bool NoteStore::LoadNoteDocument(const std::wstring& relPath, std::string& text,
+                                 StyleModel& styles, std::wstring& warning,
+                                 std::wstring& error) const {
+    if (!IsSafeRelative(relPath) || relPath.empty()) {
+        error = L"便签路径无效";
+        return false;
+    }
+    if (!NoteStorage::Load(AbsolutePath(relPath), text, styles, warning)) {
+        error = L"读取便签失败：" + relPath;
+        return false;
+    }
+    return true;
 }
 
 bool NoteStore::SaveNote(const std::wstring& relPath, const std::wstring& groupRel,
                          const std::string& bytes, const std::wstring& title,
-                         NoteFormat format, std::wstring& savedRel,
+                         std::wstring& savedRel, std::wstring& error) {
+    StyleModel empty;
+    return SaveNote(relPath, groupRel, bytes, title, empty, savedRel, error);
+}
+
+bool NoteStore::SaveNote(const std::wstring& relPath, const std::wstring& groupRel,
+                         const std::string& bytes, const std::wstring& title,
+                         const StyleModel& styles, std::wstring& savedRel,
                          std::wstring& error) {
     if (!IsSafeRelative(relPath) || !IsSafeRelative(groupRel)) {
         error = L"便签路径无效";
         return false;
     }
 
-    std::wstring groupPath = groupRel;
+    const std::wstring groupPath = groupRel;
     std::error_code ec;
     fs::path groupDir = groupPath.empty() ? fs::path(dataDir_)
                                           : fs::path(AbsolutePath(groupPath));
@@ -434,7 +408,7 @@ bool NoteStore::SaveNote(const std::wstring& relPath, const std::wstring& groupR
 
     std::wstring base = SanitizeName(title.empty() ? L"无标题便签" : title);
     if (base.empty()) base = L"无标题便签";
-    const std::wstring extension = format == NoteFormat::Markdown ? L".md" : L".wxr";
+    const std::wstring extension = L".txt";
     const std::wstring lowerBase = Lower(base);
     if (lowerBase.size() > extension.size() &&
         lowerBase.substr(lowerBase.size() - extension.size()) == extension) {
@@ -446,27 +420,72 @@ bool NoteStore::SaveNote(const std::wstring& relPath, const std::wstring& groupR
     fs::path current = relPath.empty() ? fs::path() : fs::path(AbsolutePath(relPath));
     bool currentExists = !current.empty() && fs::is_regular_file(current, ec);
 
-    fs::path target = groupDir / (base + extension);
-    if (currentExists && SamePath(target, current)) {
+    fs::path desired = groupDir / (base + extension);
+    fs::path target = desired;
+    bool caseOnlyRename = false;
+    if (currentExists && SamePath(desired, current)) {
+        // 先写回原文件，写完后再单独处理大小写改名。
+        caseOnlyRename =
+            desired.filename().wstring() != current.filename().wstring();
         target = current;
-    } else if (fs::exists(target, ec)) {
+    } else if (fs::exists(desired, ec)) {
         std::wstring unique = UniqueName(groupDir, base, extension);
-        target = groupDir / (unique + extension);
+        desired = groupDir / (unique + extension);
+        target = desired;
     }
 
-    if (!WriteAllBytes(target, bytes, error)) return false;
+    if (!NoteStorage::Save(target.wstring(), bytes, styles, error)) return false;
 
-    if (currentExists && !SamePath(current, target)) {
+    if (caseOnlyRename) {
+        const std::wstring oldStyle = NoteStorage::StylePath(target.wstring());
+        if (!RenamePath(target, desired, error)) return false;
+        target = desired;
+        // 样式 sidecar 跟随正文一起改大小写。
+        if (fs::exists(fs::path(oldStyle), ec)) {
+            const std::wstring newStyle =
+                NoteStorage::StylePath(target.wstring());
+            RenamePath(fs::path(oldStyle), fs::path(newStyle), error);
+        }
+    } else if (currentExists && !SamePath(current, target)) {
+        const std::wstring oldStyle = NoteStorage::StylePath(current.wstring());
         fs::remove(current, ec);
         if (ec) {
             error = L"旧便签文件删除失败：" + current.wstring();
             return false;
         }
+        fs::remove(fs::path(oldStyle), ec);
     }
 
     fs::path relative = target.lexically_relative(fs::path(dataDir_));
     savedRel = relative.wstring();
     return true;
+}
+
+bool NoteStore::SaveNoteAutosave(const std::wstring& relPath,
+                                 const std::string& bytes,
+                                 const StyleModel& styles,
+                                 std::wstring& error) {
+    if (!IsSafeRelative(relPath) || relPath.empty()) {
+        error = L"便签路径无效";
+        return false;
+    }
+    return NoteStorage::SaveAutosave(AbsolutePath(relPath), bytes, styles, error);
+}
+
+void NoteStore::RemoveNoteAutosave(const std::wstring& relPath) {
+    if (!IsSafeRelative(relPath) || relPath.empty()) return;
+    NoteStorage::RemoveAutosave(AbsolutePath(relPath));
+}
+
+bool NoteStore::HasNoteAutosave(const std::wstring& relPath) const {
+    if (!IsSafeRelative(relPath) || relPath.empty()) return false;
+    return NoteStorage::HasAutosave(AbsolutePath(relPath));
+}
+
+bool NoteStore::LoadNoteAutosave(const std::wstring& relPath, std::string& text,
+                                 StyleModel& styles, std::wstring& warning) const {
+    if (!IsSafeRelative(relPath) || relPath.empty()) return false;
+    return NoteStorage::LoadAutosave(AbsolutePath(relPath), text, styles, warning);
 }
 
 bool NoteStore::MoveNote(const std::wstring& relPath, const std::wstring& newGroupRel,
@@ -508,6 +527,20 @@ bool NoteStore::MoveNote(const std::wstring& relPath, const std::wstring& newGro
         error = L"移动便签失败：" + target.wstring();
         return false;
     }
+
+    const fs::path sourceStyle(NoteStorage::StylePath(source.wstring()));
+    if (fs::is_regular_file(sourceStyle, ec)) {
+        const fs::path targetStyle(NoteStorage::StylePath(target.wstring()));
+        fs::rename(sourceStyle, targetStyle, ec);
+        if (ec) {
+            // 正文已经移动，尽量回滚，避免留下没有样式的半成品。
+            std::error_code ignored;
+            fs::rename(target, source, ignored);
+            error = L"移动样式文件失败：" + targetStyle.wstring();
+            return false;
+        }
+    }
+
     newRel = JoinRelative(targetGroupRel, name);
     return true;
 }
@@ -525,62 +558,24 @@ bool NoteStore::DeleteNote(const std::wstring& relPath, std::wstring& error) {
         error = L"删除便签文件失败：" + target.wstring();
         return false;
     }
+    fs::remove(fs::path(NoteStorage::StylePath(target.wstring())), ec);
     return true;
 }
 
-std::wstring NoteStore::DeriveTitle(const std::wstring& markdown) {
+std::wstring NoteStore::DeriveTitle(const std::wstring& text) {
     size_t start = 0;
-    while (start <= markdown.size()) {
-        size_t newline = markdown.find(L'\n', start);
+    while (start <= text.size()) {
+        const size_t newline = text.find(L'\n', start);
         std::wstring line = newline == std::wstring::npos
-                                ? markdown.substr(start)
-                                : markdown.substr(start, newline - start);
+                                ? text.substr(start)
+                                : text.substr(start, newline - start);
         if (!line.empty() && line.back() == L'\r') line.pop_back();
         line = Trim(line);
-
         if (!line.empty()) {
-            bool markerOnly = true;
-            for (wchar_t ch : line) {
-                if (ch != L'-' && ch != L'*' && ch != L'_' && !iswspace(ch)) {
-                    markerOnly = false;
-                    break;
-                }
-            }
-            if (markerOnly) {
-                if (newline == std::wstring::npos) break;
-                start = newline + 1;
-                continue;
-            }
-
-            int level = 0;
-            while (level < (int)line.size() && level < 6 && line[level] == L'#') ++level;
-            if (level > 0 && level < (int)line.size() && line[level] == L' ') {
-                line = line.substr(level + 1);
-            } else if (line.rfind(L"> ", 0) == 0) {
-                line = line.substr(2);
-            } else if (line.rfind(L"- ", 0) == 0 || line.rfind(L"* ", 0) == 0 ||
-                       line.rfind(L"+ ", 0) == 0) {
-                line = line.substr(2);
-            } else {
-                int digits = 0;
-                while (digits < (int)line.size() && iswdigit(line[digits])) ++digits;
-                if (digits > 0 && digits + 1 < (int)line.size() && line[digits] == L'.' &&
-                    line[digits + 1] == L' ') {
-                    line = line.substr(digits + 2);
-                }
-            }
-
-            line = StripInlineMarkdown(line);
-            line = Trim(line);
-            if (line.empty()) {
-                if (newline == std::wstring::npos) break;
-                start = newline + 1;
-                continue;
-            }
-            if (line.size() > 120) line = line.substr(0, 120) + L"…";
+            // 纯文本正文：第一行就是标题，不再剥离 Markdown 标记。
+            if (line.size() > 120) line.resize(120);
             return line;
         }
-
         if (newline == std::wstring::npos) break;
         start = newline + 1;
     }

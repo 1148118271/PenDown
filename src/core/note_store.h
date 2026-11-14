@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 
+#include "core/style_model.h"
+
 // 文件系统里的一个分组目录。rel_path 相对 data 目录，例如「工作/项目 A」。
 struct NoteGroupEntry {
     std::wstring rel_path;
@@ -10,22 +12,16 @@ struct NoteGroupEntry {
     std::wstring name;
 };
 
-// 便签正文的两种存储格式：Markdown 或 wxRichText XML
-enum class NoteFormat {
-    Markdown,
-    RichText,
-};
-
-// 文件系统里的一条便签文件：.md 或 .wxr
+// 文件系统里的一条便签文件：正文为 UTF-8 .txt，样式保存在同名 .style.json。
 struct NoteFileEntry {
     std::wstring rel_path;
     std::wstring group_path;
     std::wstring title;
-    NoteFormat format = NoteFormat::Markdown;
 };
 
-// 便签存储：data 目录下每个文件夹就是一个分组，每个文件就是一条便签。
-// 正文保存为 Markdown（.md）或 wxRichText XML（.wxr），不经过 SQLite。
+// 便签存储：data 目录下每个文件夹就是一个分组，每个 .txt 文件就是一条便签。
+// 正文不写入 Markdown 语法；颜色/字体等样式保存在 sidecar JSON。
+// 旧版 .md 文件不再列出，也不会被删除，方便用户自行转换。
 class NoteStore {
 public:
     bool Open(const std::wstring& dataDir, std::wstring& error);
@@ -44,15 +40,29 @@ public:
     bool DeleteGroup(const std::wstring& relPath, std::wstring& error);
 
     bool ReadNote(const std::wstring& relPath, std::string& bytes, std::wstring& error) const;
+    bool LoadNoteDocument(const std::wstring& relPath, std::string& text,
+                          StyleModel& styles, std::wstring& warning,
+                          std::wstring& error) const;
     // relPath 为空表示新建；标题来自正文第一行，标题变化会重命名文件。
+    // 正文和样式文件一起保存；空样式不会生成 sidecar。
     bool SaveNote(const std::wstring& relPath, const std::wstring& groupRel,
                   const std::string& bytes, const std::wstring& title,
-                  NoteFormat format, std::wstring& savedRel, std::wstring& error);
+                  const StyleModel& styles, std::wstring& savedRel,
+                  std::wstring& error);
+    bool SaveNote(const std::wstring& relPath, const std::wstring& groupRel,
+                  const std::string& bytes, const std::wstring& title,
+                  std::wstring& savedRel, std::wstring& error);
+    bool SaveNoteAutosave(const std::wstring& relPath, const std::string& bytes,
+                          const StyleModel& styles, std::wstring& error);
+    void RemoveNoteAutosave(const std::wstring& relPath);
+    bool HasNoteAutosave(const std::wstring& relPath) const;
+    bool LoadNoteAutosave(const std::wstring& relPath, std::string& text,
+                          StyleModel& styles, std::wstring& warning) const;
     bool MoveNote(const std::wstring& relPath, const std::wstring& newGroupRel,
                   std::wstring& newRel, std::wstring& error);
     bool DeleteNote(const std::wstring& relPath, std::wstring& error);
 
-    static std::wstring DeriveTitle(const std::wstring& markdown);
+    static std::wstring DeriveTitle(const std::wstring& text);
 
 private:
     static std::wstring SanitizeName(const std::wstring& name);

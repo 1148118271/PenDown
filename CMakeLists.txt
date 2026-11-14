@@ -17,12 +17,12 @@ if(wxWidgets_FOUND)
     if(TARGET wx::adv)
         list(APPEND PENDOWN_WX_LIBS wx::adv)
     endif()
-    if(TARGET wx::richtext)
-        list(APPEND PENDOWN_WX_LIBS wx::richtext)
+    if(TARGET wx::stc)
+        list(APPEND PENDOWN_WX_LIBS wx::stc)
     endif()
     message(STATUS "wxWidgets (CONFIG): ${wxWidgets_VERSION_STRING}")
 else()
-    find_package(wxWidgets REQUIRED COMPONENTS core base adv richtext)
+    find_package(wxWidgets REQUIRED COMPONENTS core base adv stc)
     include(${wxWidgets_USE_FILE})
     set(PENDOWN_WX_LIBS ${wxWidgets_LIBRARIES})
     message(STATUS "wxWidgets (MODULE): ${wxWidgets_VERSION_STRING}")
@@ -38,11 +38,17 @@ set(PENDOWN_SOURCES
     src/core/text.cpp
     src/core/selftest.cpp
     src/core/git_sync.cpp
+    src/core/style_model.cpp
+    src/core/link_model.cpp
+    src/core/note_storage.cpp
 
     src/ui/main_frame.cpp
     src/ui/note_tree_ctrl.cpp
     src/ui/note_window.cpp
-    src/ui/markdown_preview.cpp
+    src/ui/note_editor.cpp
+    src/ui/find_replace_dialog.cpp
+    src/ui/color_popup.cpp
+    src/ui/style_popup.cpp
     src/ui/name_dialog.cpp
     src/ui/rounded_panel.cpp
     src/ui/settings_dialog.cpp

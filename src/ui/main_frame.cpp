@@ -46,10 +46,8 @@ namespace {
 enum {
     ID_CTX_NEW_SUBGROUP = wxID_HIGHEST + 300,
     ID_CTX_NEW_NOTE,
-    ID_CTX_NEW_MARKDOWN_NOTE,
     ID_CTX_NEW_GROUP,
     ID_CTX_NEW_ROOT_NOTE,
-    ID_CTX_NEW_ROOT_MARKDOWN_NOTE,
     ID_CTX_OPEN,
     ID_CTX_RENAME,
     ID_CTX_MOVE,
@@ -60,7 +58,6 @@ enum {
 
 constexpr int kHotkeyShowMainId = 0x5101;
 constexpr int kHotkeyNewNoteId = 0x5102;
-constexpr int kHotkeyNewMarkdownId = 0x5103;
 
 std::wstring LowerText(std::wstring text) {
     for (wchar_t& ch : text) ch = (wchar_t)towlower(ch);
@@ -101,9 +98,23 @@ std::wstring ReplacePathPrefix(const std::wstring& path, const std::wstring& old
     return path;
 }
 
+wxRect PrimaryWorkArea() {
+    // wxDisplay(0) 是系统主显示器；启动时默认回到这里。
+    return wxDisplay((unsigned)0).GetClientArea();
+}
+
+void CenterOnPrimary(wxWindow* window) {
+    if (!window) return;
+    const wxRect workArea = PrimaryWorkArea();
+    wxSize size = window->GetSize();
+    size.x = std::min(size.x, workArea.width);
+    size.y = std::min(size.y, workArea.height);
+    window->SetSize(workArea.x + (workArea.width - size.x) / 2,
+                    workArea.y + (workArea.height - size.y) / 2, size.x, size.y);
+}
+
 wxSize DefaultWindowSize(wxWindow* window) {
-    wxDisplay display((unsigned)0);
-    wxRect workArea = display.GetClientArea();
+    const wxRect workArea = PrimaryWorkArea();
     int minWidth = window->FromDIP(320);
     int minHeight = window->FromDIP(540);
     int width = std::min(window->FromDIP(440), (int)(workArea.width * 0.33));
@@ -208,9 +219,7 @@ WXLRESULT MainFrame::MSWWindowProc(WXUINT message, WXWPARAM wParam, WXLPARAM lPa
             RestoreFromTray();
         } else if (id == kHotkeyNewNoteId) {
             // 只打开便签编辑器，不把主窗口从托盘带出来
-            AddNote(NoteFormat::RichText);
-        } else if (id == kHotkeyNewMarkdownId) {
-            AddNote(NoteFormat::Markdown);
+            AddNote();
         }
         return 0;
     }
@@ -262,21 +271,16 @@ void MainFrame::BuildUi() {
                                      L"新建分组 (Ctrl+Shift+N)：选中分组时在其下新增子分组",
                                      IconButton::Kind::Normal, buttonSize, 12);
     addNoteButton_ = new IconButton(titleBar, ID_NOTE_ADD, AppIcon::NotePlus,
-                                    L"新建普通便签 (Ctrl+N)：未选分组时创建在根目录",
+                                    L"新建便签 (Ctrl+N)：未选分组时创建在根目录",
                                     IconButton::Kind::Normal, buttonSize, 12);
-    addMarkdownButton_ = new IconButton(titleBar, ID_NOTE_ADD_MARKDOWN, AppIcon::Markdown,
-                                        L"新建 Markdown 便签 (Ctrl+M)：编辑原文或切换预览模式",
-                                        IconButton::Kind::Normal, buttonSize, 12);
     deleteButton_ = new IconButton(titleBar, ID_NOTE_DELETE, AppIcon::Trash,
                                    L"删除选中的分组或便签 (Del)", IconButton::Kind::Danger,
                                    buttonSize, 12);
     addGroupButton_->SetEventTarget(this);
     addNoteButton_->SetEventTarget(this);
-    addMarkdownButton_->SetEventTarget(this);
     deleteButton_->SetEventTarget(this);
     bar->Add(addGroupButton_, 0, wxRIGHT, FromDIP(1));
     bar->Add(addNoteButton_, 0, wxRIGHT, FromDIP(1));
-    bar->Add(addMarkdownButton_, 0, wxRIGHT, FromDIP(1));
     bar->Add(deleteButton_, 0);
     bar->AddStretchSpacer(1);
 
@@ -350,9 +354,7 @@ void MainFrame::BuildUi() {
 
 void MainFrame::BindEvents() {
     Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { AddGroup(); }, ID_NOTE_ADD_GROUP);
-    Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { AddNote(NoteFormat::RichText); }, ID_NOTE_ADD);
-    Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { AddNote(NoteFormat::Markdown); },
-         ID_NOTE_ADD_MARKDOWN);
+    Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { AddNote(); }, ID_NOTE_ADD);
     Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { DeleteSelected(); }, ID_NOTE_DELETE);
     Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { Iconize(); }, ID_WINDOW_MINIMIZE);
     Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { Maximize(!IsMaximized()); },
@@ -377,12 +379,8 @@ void MainFrame::BindEvents() {
             if (event.ShiftDown()) {
                 AddGroup();
             } else {
-                AddNote(NoteFormat::RichText);
+                AddNote();
             }
-            return;
-        }
-        if (event.ControlDown() && event.GetKeyCode() == 'M') {
-            AddNote(NoteFormat::Markdown);
             return;
         }
         if (event.GetKeyCode() == WXK_F5) {
@@ -411,7 +409,7 @@ void MainFrame::BindEvents() {
 void MainFrame::RestoreLayout() {
     wxConfigBase* config = wxConfigBase::Get();
     if (!config) {
-        Centre();
+        CenterOnPrimary(this);
         return;
     }
 
@@ -419,7 +417,7 @@ void MainFrame::RestoreLayout() {
     config->Read("/Window/Version", &layoutVersion, 0);
     if (layoutVersion < 4) {
         // 旧版主窗口是宽屏任务列表，升级后第一次启动改用窄长便签窗口
-        Centre();
+        CenterOnPrimary(this);
         config->Write("/Window/Version", 4);
         config->Write("/Window/X", GetPosition().x);
         config->Write("/Window/Y", GetPosition().y);
@@ -440,21 +438,24 @@ void MainFrame::RestoreLayout() {
 
     int minWidth = FromDIP(320);
     int minHeight = FromDIP(540);
-    if (x != -1 && y != -1 && width >= minWidth && height >= minHeight) {
-        int displayIndex = wxDisplay::GetFromPoint(wxPoint((int)x, (int)y));
-        if (displayIndex == wxNOT_FOUND) {
-            Centre();
-        } else {
-            wxRect workArea = wxDisplay(displayIndex).GetClientArea();
-            int w = std::min(std::max((int)width, minWidth), workArea.width);
-            int h = std::min(std::max((int)height, minHeight), workArea.height);
-            int left = std::min(std::max((int)x, workArea.x), workArea.GetRight() - w);
-            int top = std::min(std::max((int)y, workArea.y), workArea.GetBottom() - h);
-            SetSize(wxRect(left, top, w, h));
-        }
-    } else {
-        Centre();
+    const wxRect primary = PrimaryWorkArea();
+    if (x == -1 || y == -1 || width < minWidth || height < minHeight) {
+        CenterOnPrimary(this);
+        return;
     }
+
+    if (!primary.Contains(wxPoint((int)x, (int)y))) {
+        // 上次在副屏（或坐标已失效）打开时，本次回到主屏居中。
+        CenterOnPrimary(this);
+        return;
+    }
+
+    // 上次在主屏：保留位置和大小，但限制在主屏工作区内。
+    int w = std::min(std::max((int)width, minWidth), primary.width);
+    int h = std::min(std::max((int)height, minHeight), primary.height);
+    int left = std::min(std::max((int)x, primary.x), primary.GetRight() - w);
+    int top = std::min(std::max((int)y, primary.y), primary.GetBottom() - h);
+    SetSize(wxRect(left, top, w, h));
 }
 
 void MainFrame::SaveLayout() {
@@ -540,12 +541,10 @@ void MainFrame::LoadHotkeys() {
     };
     hotkeyShowMain_ = makeDefault('H');
     hotkeyNewNote_ = makeDefault('N');
-    hotkeyNewMarkdown_ = makeDefault('M');
 
     if (wxConfigBase* config = wxConfigBase::Get()) {
         config->Read("/Hotkeys/ShowMain", &hotkeyShowMain_, hotkeyShowMain_);
         config->Read("/Hotkeys/NewNote", &hotkeyNewNote_, hotkeyNewNote_);
-        config->Read("/Hotkeys/NewMarkdown", &hotkeyNewMarkdown_, hotkeyNewMarkdown_);
     }
     RegisterHotkeys();
 }
@@ -568,7 +567,6 @@ void MainFrame::RegisterHotkeys() {
 
     registerOne(kHotkeyShowMainId, hotkeyShowMain_);
     registerOne(kHotkeyNewNoteId, hotkeyNewNote_);
-    registerOne(kHotkeyNewMarkdownId, hotkeyNewMarkdown_);
 #endif
 }
 
@@ -578,16 +576,14 @@ void MainFrame::UnregisterHotkeys() {
     if (!hwnd) return;
     ::UnregisterHotKey(hwnd, kHotkeyShowMainId);
     ::UnregisterHotKey(hwnd, kHotkeyNewNoteId);
-    ::UnregisterHotKey(hwnd, kHotkeyNewMarkdownId);
 #endif
 }
 
-bool MainFrame::ApplyHotkeys(const wxString& showMain, const wxString& newNote,
-                             const wxString& newMarkdown) {
-    HotkeySpec specs[3];
-    const wxString values[3] = {showMain, newNote, newMarkdown};
-    const wxString labels[3] = {L"显示主窗口", L"新建普通便签", L"新建 Markdown 便签"};
-    for (int i = 0; i < 3; ++i) {
+bool MainFrame::ApplyHotkeys(const wxString& showMain, const wxString& newNote) {
+    HotkeySpec specs[2];
+    const wxString values[2] = {showMain, newNote};
+    const wxString labels[2] = {L"显示主窗口", L"新建便签"};
+    for (int i = 0; i < 2; ++i) {
         if (!ParseHotkey(values[i], specs[i])) {
             wxMessageBox(L"快捷键格式无效，请重新设置。", L"设置", wxOK | wxICON_WARNING, this);
             return false;
@@ -598,8 +594,7 @@ bool MainFrame::ApplyHotkeys(const wxString& showMain, const wxString& newNote,
         return a.enabled && b.enabled && a.ctrl == b.ctrl && a.alt == b.alt &&
                a.shift == b.shift && a.virtualKey == b.virtualKey;
     };
-    if (duplicate(specs[0], specs[1]) || duplicate(specs[0], specs[2]) ||
-        duplicate(specs[1], specs[2])) {
+    if (duplicate(specs[0], specs[1])) {
         wxMessageBox(L"不同操作不能使用相同的快捷键。", L"设置", wxOK | wxICON_WARNING, this);
         return false;
     }
@@ -608,8 +603,8 @@ bool MainFrame::ApplyHotkeys(const wxString& showMain, const wxString& newNote,
     HWND hwnd = (HWND)GetHandle();
     if (!hwnd) return false;
     UnregisterHotkeys();
-    const int ids[3] = {kHotkeyShowMainId, kHotkeyNewNoteId, kHotkeyNewMarkdownId};
-    for (int i = 0; i < 3; ++i) {
+    const int ids[2] = {kHotkeyShowMainId, kHotkeyNewNoteId};
+    for (int i = 0; i < 2; ++i) {
         if (!specs[i].enabled) continue;
         UINT modifiers = 0;
         if (specs[i].ctrl) modifiers |= MOD_CONTROL;
@@ -628,11 +623,9 @@ bool MainFrame::ApplyHotkeys(const wxString& showMain, const wxString& newNote,
 
     hotkeyShowMain_ = specs[0].raw;
     hotkeyNewNote_ = specs[1].raw;
-    hotkeyNewMarkdown_ = specs[2].raw;
     if (wxConfigBase* config = wxConfigBase::Get()) {
         config->Write("/Hotkeys/ShowMain", hotkeyShowMain_);
         config->Write("/Hotkeys/NewNote", hotkeyNewNote_);
-        config->Write("/Hotkeys/NewMarkdown", hotkeyNewMarkdown_);
         config->Flush();
     }
     return true;
@@ -642,11 +635,10 @@ void MainFrame::OpenSettings() {
     wxString dataDir = store_ ? FromW(store_->DataDir()) : wxString();
     wxString showMain = hotkeyShowMain_;
     wxString newNote = hotkeyNewNote_;
-    wxString newMarkdown = hotkeyNewMarkdown_;
     GitSyncConfig gitConfig = LoadGitSyncConfig();
     for (;;) {
         SettingsDialog dialog(
-            this, dataDir, showMain, newNote, newMarkdown, gitConfig,
+            this, dataDir, showMain, newNote, gitConfig,
             [this]() { return !noteWindows_.empty(); });
         const int result = dialog.ShowModal();
         const bool pulled = dialog.DidPull();
@@ -665,13 +657,12 @@ void MainFrame::OpenSettings() {
 
         showMain = dialog.ShowMainHotkey();
         newNote = dialog.NewNoteHotkey();
-        newMarkdown = dialog.NewMarkdownHotkey();
         gitConfig = dialog.GitConfig();
         wxString gitError;
         if (!SaveGitSyncConfig(gitConfig, gitError)) {
             wxMessageBox(gitError, L"Git 配置", wxOK | wxICON_WARNING, this);
         }
-        if (ApplyHotkeys(showMain, newNote, newMarkdown)) return;
+        if (ApplyHotkeys(showMain, newNote)) return;
     }
 }
 
@@ -918,7 +909,6 @@ void MainFrame::RebuildTree() {
             noteItem.path = note.rel_path;
             noteItem.depth = 0;
             noteItem.text = note.title;
-            noteItem.markdown = note.format == NoteFormat::Markdown;
             items.push_back(std::move(noteItem));
         }
     }
@@ -953,7 +943,6 @@ void MainFrame::RebuildTree() {
                 noteItem.path = note.rel_path;
                 noteItem.depth = depth + 1;
                 noteItem.text = note.title;
-                noteItem.markdown = note.format == NoteFormat::Markdown;
                 items.push_back(std::move(noteItem));
             }
         }
@@ -1069,20 +1058,20 @@ void MainFrame::AddGroupUnder(const std::wstring& parentPath) {
     tree_->SelectItem(NoteTreeCtrl::Kind::Group, created);
 }
 
-void MainFrame::AddNote(NoteFormat format) {
-    AddNoteToGroup(ResolveNewNoteGroup(), format);
+void MainFrame::AddNote() {
+    AddNoteToGroup(ResolveNewNoteGroup());
 }
 
-void MainFrame::AddNoteToGroup(const std::wstring& groupPath, NoteFormat format) {
+void MainFrame::AddNoteToGroup(const std::wstring& groupPath) {
     const std::wstring target = groupPath;
     if (!target.empty()) ExpandGroup(target);
     RebuildTree();
 
     auto* window = new NoteWindow(
-        this, store_, L"", target, format,
+        this, store_, L"", target,
         [this](const std::wstring& oldPath, const std::wstring& notePath,
-               const std::wstring& group, NoteFormat format) {
-            OnNoteSaved(oldPath, notePath, group, format);
+               const std::wstring& group) {
+            OnNoteSaved(oldPath, notePath, group);
         },
         [this](const std::wstring& notePath, const std::wstring& group) {
             OnNoteDeleted(notePath, group);
@@ -1105,10 +1094,10 @@ void MainFrame::OpenNote(const std::wstring& notePath) {
     ExpandGroup(note->group_path);
 
     auto* window = new NoteWindow(
-        this, store_, notePath, note->group_path, note->format,
+        this, store_, notePath, note->group_path,
         [this](const std::wstring& oldPath, const std::wstring& path,
-               const std::wstring& group, NoteFormat format) {
-            OnNoteSaved(oldPath, path, group, format);
+               const std::wstring& group) {
+            OnNoteSaved(oldPath, path, group);
         },
         [this](const std::wstring& path, const std::wstring& group) {
             OnNoteDeleted(path, group);
@@ -1376,12 +1365,10 @@ void MainFrame::OnTreeContext(bool hasItem, NoteTreeCtrl::Kind kind,
     wxMenu menu;
     if (!hasItem) {
         menu.Append(ID_CTX_NEW_GROUP, L"新建分组");
-        menu.Append(ID_CTX_NEW_ROOT_NOTE, L"新建普通便签（根目录）");
-        menu.Append(ID_CTX_NEW_ROOT_MARKDOWN_NOTE, L"新建 Markdown 便签（根目录）");
+        menu.Append(ID_CTX_NEW_ROOT_NOTE, L"新建便签（根目录）");
     } else if (kind == NoteTreeCtrl::Kind::Group) {
         menu.Append(ID_CTX_NEW_SUBGROUP, L"新建子分组");
-        menu.Append(ID_CTX_NEW_NOTE, L"在此分组新建普通便签");
-        menu.Append(ID_CTX_NEW_MARKDOWN_NOTE, L"在此分组新建 Markdown 便签");
+        menu.Append(ID_CTX_NEW_NOTE, L"在此分组新建便签");
         menu.AppendSeparator();
         menu.Append(ID_CTX_RENAME, L"重命名分组");
         menu.Append(ID_CTX_MOVE, L"移动到分组...");
@@ -1399,19 +1386,13 @@ void MainFrame::OnTreeContext(bool hasItem, NoteTreeCtrl::Kind kind,
             AddGroupUnder(L"");
             break;
         case ID_CTX_NEW_ROOT_NOTE:
-            AddNoteToGroup(L"", NoteFormat::RichText);
-            break;
-        case ID_CTX_NEW_ROOT_MARKDOWN_NOTE:
-            AddNoteToGroup(L"", NoteFormat::Markdown);
+            AddNoteToGroup(L"");
             break;
         case ID_CTX_NEW_SUBGROUP:
             AddGroupUnder(path);
             break;
         case ID_CTX_NEW_NOTE:
-            AddNoteToGroup(path, NoteFormat::RichText);
-            break;
-        case ID_CTX_NEW_MARKDOWN_NOTE:
-            AddNoteToGroup(path, NoteFormat::Markdown);
+            AddNoteToGroup(path);
             break;
         case ID_CTX_OPEN:
             OpenNote(path);
@@ -1439,7 +1420,7 @@ void MainFrame::OnTreeSelection() {
 }
 
 void MainFrame::OnNoteSaved(const std::wstring& oldPath, const std::wstring& notePath,
-                            const std::wstring& groupPath, NoteFormat format) {
+                            const std::wstring& groupPath) {
     if (notePath.empty()) {
         LoadData();
         RebuildTree();
@@ -1478,7 +1459,6 @@ void MainFrame::OnNoteSaved(const std::wstring& oldPath, const std::wstring& not
     entry.rel_path = notePath;
     entry.group_path = resolvedGroup;
     entry.title = fs::path(notePath).stem().wstring();
-    entry.format = format;
     if (entry.title.empty()) entry.title = L"无标题便签";
     notes_.insert(notes_.begin(), std::move(entry));
 

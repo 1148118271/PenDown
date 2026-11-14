@@ -42,8 +42,7 @@ private:
     void LoadHotkeys();
     void RegisterHotkeys();
     void UnregisterHotkeys();
-    bool ApplyHotkeys(const wxString& showMain, const wxString& newNote,
-                      const wxString& newMarkdown);
+    bool ApplyHotkeys(const wxString& showMain, const wxString& newNote);
 
     void LoadData();
     void RebuildTree();
@@ -54,8 +53,8 @@ private:
 
     void AddGroup();
     void AddGroupUnder(const std::wstring& parentPath);
-    void AddNote(NoteFormat format);
-    void AddNoteToGroup(const std::wstring& groupPath, NoteFormat format);
+    void AddNote();
+    void AddNoteToGroup(const std::wstring& groupPath);
     void OpenNote(const std::wstring& notePath);
     void RenameSelected();
     void RenameGroup(const std::wstring& groupPath);
@@ -68,7 +67,7 @@ private:
                        const wxPoint& screen);
     void OnTreeSelection();
     void OnNoteSaved(const std::wstring& oldPath, const std::wstring& notePath,
-                     const std::wstring& groupPath, NoteFormat format);
+                     const std::wstring& groupPath);
     void OnNoteDeleted(const std::wstring& notePath, const std::wstring& groupPath);
     void OnNoteWindowClosed(NoteWindow* window);
 
@@ -90,7 +89,6 @@ private:
     NoteTreeCtrl* tree_ = nullptr;
     IconButton* addGroupButton_ = nullptr;
     IconButton* addNoteButton_ = nullptr;
-    IconButton* addMarkdownButton_ = nullptr;
     IconButton* deleteButton_ = nullptr;
     wxStaticText* countLabel_ = nullptr;
     wxStaticText* bottomStatus_ = nullptr;
@@ -100,7 +98,6 @@ private:
     bool hiddenToTray_ = false;
     wxString hotkeyShowMain_;
     wxString hotkeyNewNote_;
-    wxString hotkeyNewMarkdown_;
 
     std::vector<NoteGroupEntry> groups_;
     std::vector<NoteFileEntry> notes_;

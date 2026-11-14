@@ -7,18 +7,23 @@
 
 #include <memory>
 
+#include <wx/file.h>
+
 #include "core/note_store.h"
 #include "core/selftest.h"
 #include "core/text.h"
 #include "single_instance.h"
 #include "ui/icon_library.h"
 #include "ui/main_frame.h"
+#include "ui/note_editor.h"
 
-// PenDown：wxWidgets 的便签工具，便签以 .md / .wxr 文件保存在 data 目录。
+// PenDown：wxWidgets 的便签工具，便签正文以 .txt 保存在 data 目录，
+// 样式保存在同名 .txt.style.json。
 //
 // 启动参数（正常双击不需要任何参数）：
-//   --data <dir>          指定便签数据目录（默认是 exe 同级的 data）
-//   --selftest <report>   跑一遍文件存储自检
+//   --data <dir>              指定便签数据目录（默认是 exe 同级的 data）
+//   --selftest <report>       跑一遍文件存储 / 样式自检
+//   --editor-selftest <report> 跑一遍 wxStyledTextCtrl 编辑自检
 class PenDownApp : public wxApp {
 public:
     bool OnInit() override;
@@ -84,6 +89,9 @@ bool PenDownApp::OnInit() {
 
     wxString dataOverride;
     wxString selfTestReport;
+    wxString editorSelfTestReport;
+    wxString benchInput;
+    wxString benchReport;
 
     for (int i = 1; i < argc; ++i) {
         wxString arg = argv[i];
@@ -91,11 +99,34 @@ bool PenDownApp::OnInit() {
             dataOverride = argv[++i];
         } else if (arg == "--selftest" && i + 1 < argc) {
             selfTestReport = argv[++i];
+        } else if (arg == "--editor-selftest" && i + 1 < argc) {
+            editorSelfTestReport = argv[++i];
+        } else if (arg == "--editor-bench" && i + 2 < argc) {
+            benchInput = argv[++i];
+            benchReport = argv[++i];
         }
     }
 
     if (!selfTestReport.empty()) {
         RunSelfTest(ToW(selfTestReport));
+        return false;
+    }
+
+    if (!editorSelfTestReport.empty()) {
+        wxString report;
+        RunNoteEditorSelfTest(report);
+        wxFile file(editorSelfTestReport, wxFile::write);
+        if (file.IsOpened()) {
+            const char bom[] = {'\xEF', '\xBB', '\xBF'};
+            file.Write(bom, sizeof(bom));
+            const wxScopedCharBuffer utf8 = report.ToUTF8();
+            file.Write(utf8.data(), utf8.length());
+        }
+        return false;
+    }
+
+    if (!benchInput.empty() && !benchReport.empty()) {
+        RunNoteEditorBench(ToW(benchInput), ToW(benchReport));
         return false;
     }
 

@@ -53,6 +53,8 @@ private:
     bool EnsureRepository(std::wstring& error) const;
     bool Validate(std::wstring& error) const;
     std::vector<std::wstring> RemoteBranches() const;
+    // 写入 .gitignore，并把历史上已被跟踪的临时文件移出索引。
+    void EnsureTransientFilesIgnored() const;
 
     std::wstring dataDir_;
     std::wstring backupRoot_;

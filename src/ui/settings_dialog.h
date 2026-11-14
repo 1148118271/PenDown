@@ -45,13 +45,12 @@ class SettingsDialog : public wxDialog {
 public:
     SettingsDialog(wxWindow* parent, const wxString& dataDir,
                    const wxString& showMainHotkey, const wxString& newNoteHotkey,
-                   const wxString& newMarkdownHotkey, const GitSyncConfig& gitConfig,
+                   const GitSyncConfig& gitConfig,
                    std::function<bool()> hasOpenNotes);
 
     wxString DataDirectory() const;
     wxString ShowMainHotkey() const;
     wxString NewNoteHotkey() const;
-    wxString NewMarkdownHotkey() const;
     GitSyncConfig GitConfig() const;
     bool DidPull() const { return pulled_; }
 
@@ -77,7 +76,6 @@ private:
     wxTextCtrl* gitBranch_ = nullptr;
     HotkeyCtrl* showMain_ = nullptr;
     HotkeyCtrl* newNote_ = nullptr;
-    HotkeyCtrl* newMarkdown_ = nullptr;
     wxStaticText* gitStatus_ = nullptr;
     wxStaticText* error_ = nullptr;
     std::function<bool()> hasOpenNotes_;

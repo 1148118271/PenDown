@@ -70,6 +70,7 @@ void IconButton::SetIcon(AppIcon icon) {
 }
 
 void IconButton::SetActive(bool active) {
+    if (active_ == active) return;
     active_ = active;
     Refresh();
 }

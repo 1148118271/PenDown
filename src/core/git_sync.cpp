@@ -3,11 +3,14 @@
 #include <windows.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cstdio>
 #include <cwchar>
 #include <cwctype>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
+#include <sstream>
 #include <string>
 #include <thread>
 #include <utility>
@@ -461,6 +464,67 @@ void EnsureGroupMarkers(const fs::path& dataDir) {
     }
 }
 
+const char* const kGitIgnoreLines[] = {
+    "# PenDown transient files",
+    "*.autosave",
+    "*.autosave.style.json",
+    "*.bak",
+    "*.tmp",
+    "*.pendown-rn-*",
+};
+
+void EnsureGitIgnore(const fs::path& dataDir) {
+    const fs::path path = dataDir / L".gitignore";
+    std::string content;
+    {
+        std::ifstream file(path, std::ios::binary);
+        if (file) {
+            content.assign(std::istreambuf_iterator<char>(file),
+                           std::istreambuf_iterator<char>());
+        }
+    }
+
+    std::vector<std::string> lines;
+    {
+        std::istringstream stream(content);
+        std::string line;
+        while (std::getline(stream, line)) {
+            if (!line.empty() && line.back() == '\r') line.pop_back();
+            lines.push_back(line);
+        }
+    }
+
+    bool changed = false;
+    for (const char* required : kGitIgnoreLines) {
+        if (std::find(lines.begin(), lines.end(), required) != lines.end()) {
+            continue;
+        }
+        if (!content.empty() && content.back() != '\n') content.push_back('\n');
+        content += required;
+        content.push_back('\n');
+        lines.emplace_back(required);
+        changed = true;
+    }
+    if (!changed) return;
+
+    std::ofstream file(path, std::ios::binary | std::ios::trunc);
+    if (file) file.write(content.data(), (std::streamsize)content.size());
+}
+
+bool IsTransientGitFile(const std::string& path) {
+    std::string lower = path;
+    std::transform(lower.begin(), lower.end(), lower.begin(),
+                   [](unsigned char ch) { return (char)std::tolower(ch); });
+    const auto endsWith = [&](const char* suffix) {
+        const std::string text(suffix);
+        return lower.size() >= text.size() &&
+               lower.compare(lower.size() - text.size(), text.size(), text) == 0;
+    };
+    return endsWith(".autosave") || endsWith(".autosave.style.json") ||
+           endsWith(".bak") || endsWith(".tmp") ||
+           lower.find(".pendown-rn-") != std::string::npos;
+}
+
 bool CopyTree(const fs::path& source, const fs::path& target, std::wstring& error) {
     std::error_code ec;
     if (!fs::is_directory(source, ec)) {
@@ -766,6 +830,34 @@ std::vector<std::wstring> GitSync::RemoteBranches() const {
     return branches;
 }
 
+void GitSync::EnsureTransientFilesIgnored() const {
+    EnsureGitIgnore(fs::path(dataDir_));
+
+    const ProcessResult listed = RunGit({L"ls-files", L"-z"});
+    if (!listed.started || listed.exitCode != 0) return;
+
+    std::vector<std::wstring> victims;
+    size_t start = 0;
+    while (start < listed.stdoutText.size()) {
+        const size_t end = listed.stdoutText.find('\0', start);
+        const size_t stop =
+            end == std::string::npos ? listed.stdoutText.size() : end;
+        const std::string path = listed.stdoutText.substr(start, stop - start);
+        start = stop + 1;
+        if (IsTransientGitFile(path)) victims.push_back(BytesToWide(path));
+    }
+
+    constexpr size_t kBatch = 100;
+    for (size_t offset = 0; offset < victims.size(); offset += kBatch) {
+        std::vector<std::wstring> args = {L"rm", L"--cached", L"--quiet",
+                                          L"--ignore-unmatch", L"--"};
+        const size_t limit = std::min(victims.size(), offset + kBatch);
+        args.insert(args.end(), victims.begin() + (long)offset,
+                    victims.begin() + (long)limit);
+        RunGit(args);
+    }
+}
+
 GitSyncResult GitSync::Push(const ProgressFn& progress) {
     std::wstring error;
     if (!Validate(error)) return Failure(error);
@@ -774,6 +866,7 @@ GitSyncResult GitSync::Push(const ProgressFn& progress) {
 
     if (progress) progress(L"正在提交本地更改...");
     EnsureGroupMarkers(dataDir_);
+    EnsureTransientFilesIgnored();
     const ProcessResult add = RunGit({L"add", L"-A"});
     if (!add.started || add.exitCode != 0) {
         return Failure(ErrorWithOutput(L"暂存本地文件失败。", add));

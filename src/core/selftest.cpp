@@ -80,6 +80,10 @@ bool RunSelfTest(const std::wstring& reportPath) {
         check(fs::is_directory(dataDir), L"data folder");
         check(store.DataDir() == dataDir.lexically_normal().wstring(), L"data dir path");
 
+        NoteStore rootStore;
+        check(!rootStore.Open(fs::path(dataDir).root_path().wstring(), error),
+              L"reject drive root data folder");
+
         std::vector<NoteGroupEntry> groups;
         std::vector<NoteFileEntry> notes;
         check(store.ListTree(groups, notes, error), L"list initial tree");
@@ -278,17 +282,43 @@ bool RunSelfTest(const std::wstring& reportPath) {
             NoteStorage::StylePath(dataDir.wstring() + L"\\" + styledPath);
         check(fs::is_regular_file(renamedJson), L"renamed style sidecar");
         styledJson = renamedJson;
+        check(store.SaveNoteAutosave(styledPath, ToUtf8(L"自动保存正文"), styled,
+                                     error),
+              L"write styled autosave");
+        check(store.HasNoteAutosave(styledPath), L"styled autosave exists");
         std::wstring movedStyled;
         check(store.MoveNote(styledPath, projectRel, movedStyled, error),
               L"move styled note");
         check(fs::is_regular_file(dataDir /
                                   (movedStyled + L".style.json")),
               L"style sidecar moved");
+        check(store.HasNoteAutosave(movedStyled) &&
+                  !store.HasNoteAutosave(styledPath),
+              L"autosave moved with note");
         check(store.MoveNote(movedStyled, L"", styledPath, error),
               L"move styled note back");
+        check(store.HasNoteAutosave(styledPath) &&
+                  !store.HasNoteAutosave(movedStyled),
+              L"autosave moved back with note");
         check(store.DeleteNote(styledPath, error, NoteDeleteMode::Permanent),
               L"delete styled note");
         check(!fs::exists(styledJson), L"style sidecar removed");
+        check(!store.HasNoteAutosave(styledPath), L"autosave removed with note");
+
+        // 删除链接前面的正文时，链接区间必须整体左移；否则 URL 会覆盖错文字。
+        LinkModel shiftedLinks;
+        shiftedLinks.SetLinks(
+            {LinkRun{0, 3, "https://before.example"},
+             LinkRun{10, 15, "https://after.example"}},
+            20);
+        check(shiftedLinks.OnDelete(0, 2), L"link delete reports change");
+        check(shiftedLinks.Runs().size() == 2 &&
+                  shiftedLinks.Runs()[0].start == 0 &&
+                  shiftedLinks.Runs()[0].end == 1 &&
+                  shiftedLinks.Runs()[1].start == 8 &&
+                  shiftedLinks.Runs()[1].end == 13 &&
+                  shiftedLinks.UrlAt(8) == "https://after.example",
+              L"links shift after delete before range");
 
         check(store.ListTree(groups, notes, error) && notes.size() == 2,
               L"list root and group notes");
@@ -378,6 +408,9 @@ bool RunSelfTest(const std::wstring& reportPath) {
     check(i18n::Tr("selftest.hello") == L"Hello", L"i18n english");
     check(i18n::Plural("count.notes", 1) == L"1 note", L"i18n singular");
     check(i18n::Plural("count.notes", 2) == L"2 notes", L"i18n plural");
+    check(i18n::Plural("selftest.plural_format", 2) ==
+              L"bad format %s / 2",
+          L"i18n unsupported format stays literal");
     i18n::SetLanguage(i18n::Language::Chinese);
     check(i18n::Tr("selftest.hello") == L"你好", L"i18n chinese");
     check(i18n::Plural("count.notes", 2) == L"2 条", L"i18n chinese plural");

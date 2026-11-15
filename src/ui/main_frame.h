@@ -83,7 +83,7 @@ private:
     void ExpandGroup(const std::wstring& groupPath);
     bool IsGroupExpanded(const std::wstring& groupPath) const;
     void CollectGroupTree(const std::wstring& groupPath, std::set<std::wstring>& paths) const;
-    void CloseNoteWindowsInGroups(const std::set<std::wstring>& groupPaths);
+    bool CloseNoteWindowsInGroups(const std::set<std::wstring>& groupPaths);
 
     std::shared_ptr<NoteStore> store_;
     NoteTreeCtrl* tree_ = nullptr;

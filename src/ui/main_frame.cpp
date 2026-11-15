@@ -1396,7 +1396,7 @@ void MainFrame::DeleteGroup(const std::wstring& groupPath) {
         wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION);
     if (answer != wxYES) return;
 
-    CloseNoteWindowsInGroups(subtree);
+    if (!CloseNoteWindowsInGroups(subtree)) return;
     std::wstring error;
     if (!store_ || !store_->DeleteGroup(targetPath, error)) {
         dialogs::Message(
@@ -1421,6 +1421,16 @@ void MainFrame::DeleteGroup(const std::wstring& groupPath) {
 void MainFrame::DeleteNote(const std::wstring& notePath) {
     // notePath 可能是 selectedNotePath_ 的引用，后面会 clear，必须先复制。
     const std::wstring targetPath = notePath;
+
+    // 已经打开的便签由窗口自己删除：它会在文件真正删除成功后才销毁，
+    // 删除失败时保留窗口和未保存内容，避免主界面先 Destroy 导致内容丢失。
+    if (NoteWindow* window = FindNoteWindow(targetPath)) {
+        if (window->IsIconized()) window->Iconize(false);
+        window->Raise();
+        window->DeleteNote();
+        return;
+    }
+
     const NoteFileEntry* note = FindNote(targetPath);
     if (!note) return;
     std::wstring title = note->title;
@@ -1434,12 +1444,6 @@ void MainFrame::DeleteNote(const std::wstring& notePath) {
         UiText("main.delete_note"),
         wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION);
     if (answer != wxYES) return;
-
-    if (NoteWindow* window = FindNoteWindow(targetPath)) {
-        noteWindows_.erase(std::remove(noteWindows_.begin(), noteWindows_.end(), window),
-                           noteWindows_.end());
-        window->Destroy();
-    }
 
     std::wstring error;
     if (!store_ || !store_->DeleteNote(targetPath, error)) {
@@ -1626,8 +1630,9 @@ const NoteFileEntry* MainFrame::FindNote(const std::wstring& notePath) const {
 }
 
 NoteWindow* MainFrame::FindNoteWindow(const std::wstring& notePath) const {
+    const std::wstring key = LowerText(notePath);
     for (NoteWindow* window : noteWindows_) {
-        if (window && window->NotePath() == notePath) return window;
+        if (window && LowerText(window->NotePath()) == key) return window;
     }
     return nullptr;
 }
@@ -1702,7 +1707,7 @@ void MainFrame::CollectGroupTree(const std::wstring& groupPath,
     }
 }
 
-void MainFrame::CloseNoteWindowsInGroups(const std::set<std::wstring>& groupPaths) {
+bool MainFrame::CloseNoteWindowsInGroups(const std::set<std::wstring>& groupPaths) {
     std::vector<NoteWindow*> victims;
     for (NoteWindow* window : noteWindows_) {
         if (window && IsPathInGroups(window->GroupPath(), groupPaths)) {
@@ -1710,8 +1715,9 @@ void MainFrame::CloseNoteWindowsInGroups(const std::set<std::wstring>& groupPath
         }
     }
     for (NoteWindow* window : victims) {
-        noteWindows_.erase(std::remove(noteWindows_.begin(), noteWindows_.end(), window),
-                           noteWindows_.end());
-        window->Destroy();
+        // 走正常 Close 流程，让未保存内容有机会保存或由用户取消；不能
+        // 直接 Destroy，否则分组删除失败时窗口和内容都已经丢失。
+        if (!window->Close()) return false;
     }
+    return true;
 }

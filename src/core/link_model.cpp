@@ -159,9 +159,19 @@ bool LinkModel::OnDelete(long pos, long length) {
     std::vector<LinkRun> result;
     result.reserve(links_.size() + 1);
     bool changed = false;
-    for (const LinkRun& link : links_) {
-        if (link.end <= pos || link.start >= end) {
+    for (const LinkRun& source : links_) {
+        LinkRun link = source;
+        if (link.end <= pos) {
+            // 删除区间在链接右侧，链接不受影响。
             result.push_back(link);
+            continue;
+        }
+        if (link.start >= end) {
+            // 删除区间完全在链接左侧：链接整体左移。
+            link.start -= length;
+            link.end -= length;
+            result.push_back(link);
+            changed = true;
             continue;
         }
         changed = true;

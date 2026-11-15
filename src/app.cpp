@@ -120,13 +120,14 @@ bool PenDownApp::OnInit() {
     }
 
     if (!selfTestReport.empty()) {
-        RunSelfTest(ToW(selfTestReport));
+        const bool ok = RunSelfTest(ToW(selfTestReport));
+        SetErrorExitCode(ok ? 0 : 1);
         return false;
     }
 
     if (!editorSelfTestReport.empty()) {
         wxString report;
-        RunNoteEditorSelfTest(report);
+        const bool ok = RunNoteEditorSelfTest(report);
         wxFile file(editorSelfTestReport, wxFile::write);
         if (file.IsOpened()) {
             const char bom[] = {'\xEF', '\xBB', '\xBF'};
@@ -134,16 +135,22 @@ bool PenDownApp::OnInit() {
             const wxScopedCharBuffer utf8 = report.ToUTF8();
             file.Write(utf8.data(), utf8.length());
         }
+        SetErrorExitCode(ok ? 0 : 1);
         return false;
     }
 
     if (!benchInput.empty() && !benchReport.empty()) {
-        RunNoteEditorBench(ToW(benchInput), ToW(benchReport));
+        const bool ok = RunNoteEditorBench(ToW(benchInput), ToW(benchReport));
+        SetErrorExitCode(ok ? 0 : 1);
         return false;
     }
 
 #ifdef __WXMSW__
-    if (!ClaimSingleInstance()) return false;
+    if (!ClaimSingleInstance()) {
+        // 已有实例在运行不是错误，第二个进程正常退出即可。
+        SetErrorExitCode(0);
+        return false;
+    }
 #endif
 
     const wxString defaultDataDir = executable.GetPathWithSep() + L"data";

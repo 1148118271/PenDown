@@ -38,6 +38,9 @@ public:
     const std::wstring& NotePath() const { return notePath_; }
     const std::wstring& GroupPath() const { return groupPath_; }
     void UpdateLocation(const std::wstring& notePath, const std::wstring& groupPath);
+    // 删除便签。主窗口删除一条已经打开的便签时也应走这里，确保文件删除
+    // 成功后才销毁窗口，失败时保留编辑内容和窗口。
+    void DeleteNote();
 
 #ifdef __WXMSW__
     WXLRESULT MSWWindowProc(WXUINT message, WXWPARAM wParam, WXLPARAM lParam) override;
@@ -50,7 +53,6 @@ private:
     bool SaveNote();
     void SaveAutosave();
     void RemoveAutosave();
-    void DeleteNote();
     void ToggleColorPopup();
     void ToggleStylePopup();
     void ApplyColour(const wxColour& colour, bool clear, ColorTarget target);

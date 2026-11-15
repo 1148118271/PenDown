@@ -203,7 +203,13 @@ bool NoteStore::Open(const std::wstring& dataDir, std::wstring& error) {
 
     fs::path absolute = fs::absolute(requested, ec);
     if (ec) absolute = requested;
-    dataDir_ = absolute.lexically_normal().wstring();
+    absolute = absolute.lexically_normal();
+    if (absolute == absolute.root_path()) {
+        // “C:\\” 去掉尾部分隔符会变成“C:”，即当前目录而不是根目录。
+        error = i18n::Tr("note_store.the_data_folder_cannot_be_a_drive_root");
+        return false;
+    }
+    dataDir_ = absolute.wstring();
     while (!dataDir_.empty() &&
            (dataDir_.back() == L'\\' || dataDir_.back() == L'/')) {
         dataDir_.pop_back();
@@ -643,6 +649,26 @@ bool NoteStore::MoveNote(const std::wstring& relPath, const std::wstring& newGro
             return false;
         }
     }
+
+    // 自动保存只是崩溃恢复用的 sidecar；随正文一起迁移。迁移失败时保留
+    // 旧文件，不阻断正文移动，下一次自动保存会写到新路径。
+    const auto moveSidecar = [](const std::wstring& from, const std::wstring& to) {
+        std::error_code sidecarError;
+        if (!fs::is_regular_file(fs::path(from), sidecarError)) return;
+        fs::rename(fs::path(from), fs::path(to), sidecarError);
+        if (!sidecarError) return;
+        sidecarError.clear();
+        fs::copy_file(fs::path(from), fs::path(to),
+                      fs::copy_options::overwrite_existing, sidecarError);
+        if (!sidecarError) {
+            std::error_code ignored;
+            fs::remove(fs::path(from), ignored);
+        }
+    };
+    moveSidecar(NoteStorage::AutosavePath(source.wstring()),
+                NoteStorage::AutosavePath(target.wstring()));
+    moveSidecar(NoteStorage::AutosaveStylePath(source.wstring()),
+                NoteStorage::AutosaveStylePath(target.wstring()));
 
     newRel = JoinRelative(targetGroupRel, name);
     return true;

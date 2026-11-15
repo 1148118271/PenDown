@@ -130,8 +130,9 @@ void NoteTreeCtrl::OnDrawItem(wxDC& dc, const wxRect& rect, size_t n) const {
                 dc.DrawBitmap(chevron, ChevronX(item), y, true);
             }
         }
-        const wxBitmap& folder =
-            CachedIcon(AppIcon::Folder, iconSize, Theme::TextMuted());
+        const wxBitmap& folder = CachedIcon(
+            item.expanded ? AppIcon::FolderOpen : AppIcon::FolderClosed,
+            iconSize, Theme::TextMuted());
         if (folder.IsOk()) dc.DrawBitmap(folder, IconX(item), iconY, true);
         dc.SetTextForeground(Theme::Text());
     } else {

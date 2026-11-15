@@ -1,0 +1,58 @@
+name: Windows CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    env:
+      VCPKG_ROOT: C:\vcpkg
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Bootstrap vcpkg
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "$env:VCPKG_ROOT\vcpkg.exe")) {
+            if (Test-Path "$env:VCPKG_ROOT\.git") {
+              git -C $env:VCPKG_ROOT pull --ff-only
+            } else {
+              git clone --depth 1 https://github.com/microsoft/vcpkg.git $env:VCPKG_ROOT
+            }
+            & "$env:VCPKG_ROOT\bootstrap-vcpkg.bat"
+          }
+
+      - name: Cache vcpkg packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            C:\vcpkg\installed
+            C:\vcpkg\packages
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('CMakePresets.json') }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-
+
+      - name: Install wxWidgets
+        shell: pwsh
+        run: |
+          & "$env:VCPKG_ROOT\vcpkg.exe" install wxwidgets:x64-windows --clean-after-build
+
+      - name: Configure
+        shell: pwsh
+        run: cmake --preset vcpkg
+
+      - name: Build
+        shell: pwsh
+        run: cmake --build --preset vcpkg-release
+
+      - name: Test
+        shell: pwsh
+        run: ctest --test-dir build/vcpkg -C Release --output-on-failure

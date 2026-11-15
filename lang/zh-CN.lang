@@ -658,6 +658,9 @@ note_store.rename_failed="重命名失败："
 # The data folder is empty.
 note_store.the_data_folder_is_empty="数据目录为空"
 
+# The data folder cannot be a drive root.
+note_store.the_data_folder_cannot_be_a_drive_root="数据目录不能是磁盘根目录。"
+
 # The delete operation was canceled.
 note_store.the_delete_operation_was_canceled="删除操作已取消"
 
@@ -693,6 +696,9 @@ note_store.the_target_group_does_not_exist="目标分组不存在"
 
 # Hello
 selftest.hello="你好"
+
+# Test-only: malformed format placeholders must stay literal.
+selftest.plural_format="坏格式 %s / %ld"
 
 # Access token, encrypted and stored on this computer
 settings.access_token_encrypted_and_stored_on_this_comput="访问令牌，加密保存在本机"

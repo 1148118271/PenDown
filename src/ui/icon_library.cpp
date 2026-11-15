@@ -21,12 +21,14 @@ struct IconFile {
 
 const IconFile kIconFiles[] = {
     {AppIcon::Trash, L"trash-2.svg"},
-    {AppIcon::Note, L"sticky-note.svg"},
+    {AppIcon::Note, L"file-pen.svg"},
     {AppIcon::Save, L"save.svg"},
     {AppIcon::Close, L"x.svg"},
     {AppIcon::Bold, L"bold.svg"},
     {AppIcon::Italic, L"italic.svg"},
     {AppIcon::Folder, L"folder.svg"},
+    {AppIcon::FolderClosed, L"folder-closed.svg"},
+    {AppIcon::FolderOpen, L"folder-open.svg"},
     {AppIcon::FolderPlus, L"folder-plus.svg"},
     {AppIcon::ChevronRight, L"chevron-right.svg"},
     {AppIcon::ChevronDown, L"chevron-down.svg"},

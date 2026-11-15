@@ -367,9 +367,12 @@ void NoteEditor::ApplyStrike(long start, long end) {
     if (end <= start) return;
     SetIndicatorCurrent(kStrikeIndicator);
     IndicatorClearRange((int)start, (int)(end - start));
-    styles_.ForEachRun(start, end, [this](const StyleRun& run) {
-        if (styles_.GetStyle(run.styleId).strike) {
-            IndicatorFillRange((int)run.start, (int)(run.end - run.start));
+    styles_.ForEachRun(start, end, [this, start, end](const StyleRun& run) {
+        if (!styles_.GetStyle(run.styleId).strike) return;
+        const long fillStart = std::max(run.start, start);
+        const long fillEnd = std::min(run.end, end);
+        if (fillEnd > fillStart) {
+            IndicatorFillRange((int)fillStart, (int)(fillEnd - fillStart));
         }
     });
 }
@@ -408,11 +411,13 @@ void NoteEditor::ApplyPatchToRange(long start, long end, const StylePatch& patch
     if (linkUrl) {
         styles_.Links().SetRange(start, end, *linkUrl);
     }
-    EnsureSlots();
-    ApplyRange(start, end);
+    // 先把换行从样式区间里拆掉，再写入 Scintilla；顺序反过来会留下
+    // 已从模型删除、但 style byte 仍是大字号的换行符。
     const wxCharBuffer rangeText = GetTextRangeRaw((int)start, (int)end);
     styles_.RemoveNewlineStylesInRange(
         start, std::string(rangeText.data(), rangeText.length()));
+    EnsureSlots();
+    ApplyRange(start, end);
     RecycleUnusedStyles();
     // 改字号/粗体/颜色会生成新的样式槽，链接文字也可能换槽；
     // 每轮样式操作后都重新标记热点，保证链接仍然可点。
@@ -611,15 +616,15 @@ NoteEditor::FormatPainterResult NoteEditor::ApplyFormatPainter() {
 
     applying_ = true;
     const uint32_t styleId = styles_.Intern(formatPainterStyle_);
-    EnsureSlots();
     styles_.SetRange(start, end, styleId);
     // 格式刷只改外观；目标上的链接地址一起清除，避免样式被覆盖后留下
     // 看不见、点不到的链接。
     styles_.Links().ClearRange(start, end);
-    ApplyRange(start, end);
     const wxCharBuffer rangeText = GetTextRangeRaw((int)start, (int)end);
     styles_.RemoveNewlineStylesInRange(
         start, std::string(rangeText.data(), rangeText.length()));
+    EnsureSlots();
+    ApplyRange(start, end);
     RecycleUnusedStyles();
     // 格式刷也可能改变链接文字的样式槽，重新标记热点。
     RefreshLinkHotspots();
@@ -788,6 +793,8 @@ void NoteEditor::RebuildStylesFromEditor() {
     if (length > kRebuildLimit) {
         EnsureSlots();
         RecycleUnusedStyles();
+        // 删除线是独立 indicator，撤销/重做后必须按当前样式区间重新绘制。
+        ApplyStrike(0, length);
         RefreshLinkHotspots();
         return;
     }
@@ -818,6 +825,9 @@ void NoteEditor::RebuildStylesFromEditor() {
         0, std::string(buffer.data(), buffer.length()));
     EnsureSlots();
     RecycleUnusedStyles();
+    // 撤销/重做会按 style byte 重建样式区间；删除线 indicator 不在文本
+    // 撤销栈里，需要按重建后的区间重新绘制。
+    ApplyStrike(0, length);
     // 撤销/重做会按 style byte 重建样式区间；仍存在的链接需要重新标记热点。
     RefreshLinkHotspots();
 }
@@ -1133,6 +1143,20 @@ bool RunNoteEditorSelfTest(wxString& report) {
               !editor.Styles().StyleAt(0).strike,
           L"clear formatting");
 
+    // 撤销/重做会重建 style run，删除线 indicator 也必须重新绘制。
+    StyleModel strikeModel = editor.Styles();
+    strikeModel.ClearRuns();
+    TextStyle strikeStyle;
+    strikeStyle.strike = true;
+    const uint32_t strikeId = strikeModel.Intern(strikeStyle);
+    strikeModel.SetRange(0, 3, strikeId);
+    editor.SetDocument("abc", strikeModel);
+    editor.SetSelection(0, 0);
+    editor.InsertText(0, L"x");
+    editor.Undo();
+    check(editor.GetTextUtf8() == "abc" && editor.IndicatorValueAt(20, 0) > 0,
+          L"strike indicator restored after undo");
+
     StyleModel plain = editor.Styles();
     plain.ClearRuns();
     editor.SetDocument("abc\ndef", plain);
@@ -1141,6 +1165,10 @@ bool RunNoteEditorSelfTest(wxString& report) {
     editor.ApplyCommand(FormatCommand::FontLarger);
     const int largeSize = editor.Styles().StyleAt(0).sizeHundredths;
     const int heightLarge = editor.TextHeight(0);
+    check(editor.Styles().StyleAt(3).sizeHundredths ==
+              editor.Styles().DefaultStyle().sizeHundredths &&
+              editor.GetStyleAt(3) == 0,
+          L"newline style cleared before apply");
     editor.ApplyCommand(FormatCommand::FontSmaller);
     const int backSize = editor.Styles().StyleAt(0).sizeHundredths;
     const int heightBack = editor.TextHeight(0);

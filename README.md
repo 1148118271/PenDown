@@ -291,7 +291,13 @@ PenDown.exe --editor-selftest editor-selftest.txt
 PenDown.exe --editor-bench 50mb.txt bench.txt
 ```
 
-报告文件为 UTF-8，以 `OK` 或 `FAIL` 开头。`--selftest` 覆盖根目录便签、嵌套分组、移动、重命名、第一行标题、重复标题复用已有文件名、TXT/JSON 样式往返、链接独立存储、旧格式 URL 迁移与重复样式去重、样式文件删除和旧文件忽略；`--editor-selftest` 覆盖 wxStyledTextCtrl 文本往返、中文/Emoji 字节偏移、选区样式、样式槽与预定义槽保留、链接区间编辑与热点、行高回收、换行、查找和替换。
+报告文件为 UTF-8，以 `OK` 或 `FAIL` 开头。成功时进程退出码为 0，失败为非 0。`--selftest` 覆盖根目录便签、嵌套分组、移动、重命名、第一行标题、重复标题复用已有文件名、TXT/JSON 样式往返、链接独立存储、旧格式 URL 迁移与重复样式去重、样式文件删除和旧文件忽略；`--editor-selftest` 覆盖 wxStyledTextCtrl 文本往返、中文/Emoji 字节偏移、选区样式、样式槽与预定义槽保留、链接区间编辑与热点、行高回收、换行、查找和替换。
+
+也可以一次跑完 CTest（包含两个自检和语言文件 key 检查）：
+
+```powershell
+ctest --test-dir build/vcpkg -C Release --output-on-failure
+```
 
 ## 性能验证
 

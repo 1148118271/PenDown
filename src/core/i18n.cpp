@@ -160,6 +160,38 @@ const std::wstring* FindInLanguages(const std::string& key) {
     return FindMessage(fallback, key);
 }
 
+// 语言文件是外部文本，不能直接交给 swprintf 当格式串；只展开明确的
+// %ld / %d 和 %%，其他格式符原样保留，避免 %s / %n 等造成未定义行为。
+std::wstring FormatCount(const std::wstring& format, long count) {
+    const std::wstring number = std::to_wstring(count);
+    std::wstring out;
+    out.reserve(format.size() + number.size());
+    for (size_t i = 0; i < format.size();) {
+        if (format[i] != L'%') {
+            out.push_back(format[i++]);
+            continue;
+        }
+        if (i + 1 < format.size() && format[i + 1] == L'%') {
+            out.push_back(L'%');
+            i += 2;
+            continue;
+        }
+        if (i + 1 < format.size() && format[i + 1] == L'd') {
+            out += number;
+            i += 2;
+            continue;
+        }
+        if (i + 2 < format.size() && format[i + 1] == L'l' &&
+            format[i + 2] == L'd') {
+            out += number;
+            i += 3;
+            continue;
+        }
+        out.push_back(format[i++]);
+    }
+    return out;
+}
+
 }  // namespace
 
 namespace i18n {
@@ -204,9 +236,7 @@ std::wstring Plural(const char* key, long count) {
     if (!format) format = FindMessage(fallback, base);
     if (!format) return Utf8ToWide(base);
 
-    wchar_t buffer[512] = {};
-    swprintf(buffer, sizeof(buffer) / sizeof(buffer[0]), format->c_str(), count);
-    return buffer;
+    return FormatCount(*format, count);
 }
 
 }  // namespace i18n

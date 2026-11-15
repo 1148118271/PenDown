@@ -16,6 +16,8 @@ enum class AppIcon {
     Bold,
     Italic,
     Folder,
+    FolderClosed,
+    FolderOpen,
     FolderPlus,
     ChevronRight,
     ChevronDown,

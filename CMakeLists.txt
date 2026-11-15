@@ -145,3 +145,35 @@ endif()
 endif()
 
 install(TARGETS PenDown RUNTIME DESTINATION .)
+
+# ------------------------------------------------------------------
+# 测试：ctest --test-dir build/vcpkg -C Release
+# ------------------------------------------------------------------
+enable_testing()
+
+add_test(
+    NAME PenDown.SelfTest
+    COMMAND $<TARGET_FILE:PenDown> --selftest
+            "${CMAKE_CURRENT_BINARY_DIR}/selftest-$<CONFIG>.txt")
+set_tests_properties(PenDown.SelfTest PROPERTIES
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+    TIMEOUT 120)
+
+add_test(
+    NAME PenDown.EditorSelfTest
+    COMMAND $<TARGET_FILE:PenDown> --editor-selftest
+            "${CMAKE_CURRENT_BINARY_DIR}/editor-selftest-$<CONFIG>.txt")
+set_tests_properties(PenDown.EditorSelfTest PROPERTIES
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+    TIMEOUT 120)
+
+find_program(PENDOWN_POWERSHELL NAMES pwsh powershell)
+if(PENDOWN_POWERSHELL)
+    add_test(
+        NAME PenDown.CheckI18n
+        COMMAND ${PENDOWN_POWERSHELL} -NoProfile -ExecutionPolicy Bypass
+                -File "${CMAKE_CURRENT_SOURCE_DIR}/tools/check-i18n.ps1")
+    set_tests_properties(PenDown.CheckI18n PROPERTIES
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        TIMEOUT 60)
+endif()

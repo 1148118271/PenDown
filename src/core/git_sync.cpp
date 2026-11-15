@@ -665,9 +665,11 @@ std::wstring DefaultGitBackupRoot() {
     return (fs::path(LocalAppDataDir()) / L"PenDown" / L"backups").wstring();
 }
 
-GitSync::GitSync(std::wstring dataDir, GitSyncConfig config)
+GitSync::GitSync(std::wstring dataDir, GitSyncConfig config,
+                 std::wstring backupRoot)
     : dataDir_(NormalizePath(dataDir)),
-      backupRoot_(DefaultGitBackupRoot()),
+      backupRoot_(backupRoot.empty() ? DefaultGitBackupRoot()
+                                     : NormalizePath(backupRoot)),
       gitExe_(config.gitExe.empty() ? FindGitExecutable()
                                     : NormalizePath(config.gitExe)),
       config_(std::move(config)) {
@@ -726,6 +728,8 @@ GitSync::ProcessResult GitSync::RunGit(const std::vector<std::wstring>& args) co
     fullArgs.push_back(L"core.quotepath=false");
     fullArgs.push_back(L"-c");
     fullArgs.push_back(L"core.autocrlf=false");
+    fullArgs.push_back(L"-c");
+    fullArgs.push_back(L"core.longpaths=true");
     fullArgs.push_back(L"-c");
     fullArgs.push_back(L"color.ui=false");
     fullArgs.insert(fullArgs.end(), args.begin(), args.end());

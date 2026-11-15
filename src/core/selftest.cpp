@@ -5,10 +5,12 @@
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
+#include <iterator>
 #include <sstream>
 #include <string>
 #include <vector>
 
+#include "core/git_sync.h"
 #include "core/i18n.h"
 #include "core/note_store.h"
 #include "core/note_storage.h"
@@ -46,6 +48,46 @@ bool WriteReport(const std::wstring& path, const std::wstring& text) {
     std::string utf8 = ToUtf8(text);
     file.write(utf8.data(), (std::streamsize)utf8.size());
     return file.good();
+}
+
+// 测试用：直接启动 git.exe 创建 bare 仓库，避免依赖调用方的当前目录。
+bool RunGitInitBare(const std::wstring& gitExe, const std::wstring& repoPath) {
+    std::wstring command = L"\"" + gitExe + L"\" init --bare \"" + repoPath + L"\"";
+    std::vector<wchar_t> buffer(command.begin(), command.end());
+    buffer.push_back(L'\0');
+
+    STARTUPINFOW startup = {};
+    startup.cb = sizeof(startup);
+    PROCESS_INFORMATION process = {};
+    if (!::CreateProcessW(gitExe.c_str(), buffer.data(), nullptr, nullptr, FALSE,
+                          CREATE_NO_WINDOW, nullptr, nullptr, &startup, &process)) {
+        return false;
+    }
+
+    const DWORD wait = ::WaitForSingleObject(process.hProcess, 30000);
+    DWORD exitCode = 1;
+    if (wait == WAIT_TIMEOUT) {
+        ::TerminateProcess(process.hProcess, 124);
+        ::WaitForSingleObject(process.hProcess, 5000);
+    } else if (wait == WAIT_OBJECT_0) {
+        ::GetExitCodeProcess(process.hProcess, &exitCode);
+    }
+    ::CloseHandle(process.hThread);
+    ::CloseHandle(process.hProcess);
+    return wait == WAIT_OBJECT_0 && exitCode == 0;
+}
+
+bool WriteUtf8File(const fs::path& path, const std::string& text) {
+    std::ofstream file(path, std::ios::binary | std::ios::trunc);
+    if (!file) return false;
+    file.write(text.data(), (std::streamsize)text.size());
+    return file.good();
+}
+
+std::string ReadUtf8File(const fs::path& path) {
+    std::ifstream file(path, std::ios::binary);
+    return std::string((std::istreambuf_iterator<char>(file)),
+                       std::istreambuf_iterator<char>());
 }
 
 bool EndsWith(const std::wstring& path, const std::wstring& suffix) {
@@ -428,4 +470,113 @@ bool RunSelfTest(const std::wstring& reportPath) {
     }
     WriteReport(reportPath, report);
     return failures.empty();
+}
+
+int RunGitSelfTest(const std::wstring& reportPath) {
+    const std::wstring gitExe = FindGitExecutable();
+    if (gitExe.empty()) {
+        WriteReport(reportPath, L"SKIP git.exe not found");
+        return 77;
+    }
+
+    std::vector<std::wstring> failures;
+    std::wstring details;
+    int checks = 0;
+    auto check = [&](bool condition, const wchar_t* name) {
+        ++checks;
+        if (!condition) failures.push_back(name);
+    };
+
+    std::error_code ec;
+    const fs::path tempRoot =
+        fs::temp_directory_path(ec) /
+        (L"pendown-git-selftest-" + std::to_wstring(GetTickCount64()));
+    fs::create_directories(tempRoot, ec);
+    if (ec) {
+        WriteReport(reportPath, L"FAIL create temp root");
+        return 1;
+    }
+
+    const fs::path dataDir = tempRoot / L"data";
+    const fs::path secondDir = tempRoot / L"data2";
+    const fs::path remoteDir = tempRoot / L"remote repo.git";
+    const fs::path backupDir = tempRoot / L"backups";
+
+    ec.clear();
+    fs::create_directories(dataDir / L"Work" / L"Empty", ec);
+    check(!ec, L"create test data tree");
+    check(WriteUtf8File(dataDir / L"note.txt", "first"), L"write first note");
+    check(RunGitInitBare(gitExe, remoteDir.wstring()), L"init bare remote");
+
+    GitSyncConfig config;
+    config.remoteUrl = remoteDir.wstring();
+    config.branch = L"main";
+    config.gitExe = gitExe;
+
+    GitSync pushSync(dataDir.wstring(), config, backupDir.wstring());
+    const GitSyncResult firstPush = pushSync.Push();
+    check(firstPush.ok, L"push first changes");
+    if (!firstPush.ok) {
+        details += L"\npush: " + firstPush.message + L" " + firstPush.details;
+    }
+
+    ec.clear();
+    fs::create_directories(secondDir, ec);
+    check(!ec, L"create second test data folder");
+    check(WriteUtf8File(secondDir / L"local-only.txt", "local"),
+          L"write local-only file");
+
+    GitSync pullSync(secondDir.wstring(), config, backupDir.wstring());
+    const GitSyncResult firstPull = pullSync.Pull();
+    check(firstPull.ok, L"pull first changes");
+    if (!firstPull.ok) {
+        details += L"\npull: " + firstPull.message + L" " + firstPull.details;
+    }
+    check(ReadUtf8File(secondDir / L"note.txt") == "first",
+          L"pulled note body");
+    check(!fs::exists(secondDir / L"local-only.txt"),
+          L"pull overwrites local files");
+    check(!firstPull.backupPath.empty() &&
+              ReadUtf8File(fs::path(firstPull.backupPath) / L"local-only.txt") ==
+                  "local",
+          L"pull creates local backup");
+    check(fs::is_regular_file(secondDir / L"Work" / L"Empty" /
+                              L".pendown-group"),
+          L"empty group marker synchronized");
+
+    check(WriteUtf8File(dataDir / L"note.txt", "second"),
+          L"update note for second push");
+    check(WriteUtf8File(dataDir / L"note.txt.autosave", "autosave"),
+          L"write transient file");
+    GitSync pushAgain(dataDir.wstring(), config, backupDir.wstring());
+    const GitSyncResult secondPush = pushAgain.Push();
+    check(secondPush.ok, L"push second changes");
+    if (!secondPush.ok) {
+        details += L"\npush2: " + secondPush.message + L" " + secondPush.details;
+    }
+
+    GitSync pullAgain(secondDir.wstring(), config, backupDir.wstring());
+    const GitSyncResult secondPull = pullAgain.Pull();
+    check(secondPull.ok, L"pull second changes");
+    if (!secondPull.ok) {
+        details += L"\npull2: " + secondPull.message + L" " + secondPull.details;
+    }
+    check(ReadUtf8File(secondDir / L"note.txt") == "second",
+          L"pulled updated note body");
+    check(!fs::exists(secondDir / L"note.txt.autosave"),
+          L"transient autosave not synchronized");
+
+    fs::remove_all(tempRoot, ec);
+
+    std::wstring report;
+    if (failures.empty()) {
+        report = L"OK checks=" + std::to_wstring(checks);
+    } else {
+        report = L"FAIL " + std::to_wstring(failures.size()) + L"/" +
+                 std::to_wstring(checks) + L":";
+        for (const auto& item : failures) report += L" " + item + L";";
+        report += details;
+    }
+    WriteReport(reportPath, report);
+    return failures.empty() ? 0 : 1;
 }

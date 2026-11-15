@@ -27,6 +27,7 @@
 // 启动参数（正常双击不需要任何参数）：
 //   --data <dir>              指定便签数据目录（默认是 exe 同级的 data）
 //   --selftest <report>       跑一遍文件存储 / 样式自检
+//   --git-selftest <report>   跑一遍 Git 推送 / 拉取 / 备份自检
 //   --editor-selftest <report> 跑一遍 wxStyledTextCtrl 编辑自检
 class PenDownApp : public wxApp {
 public:
@@ -101,6 +102,7 @@ bool PenDownApp::OnInit() {
 
     wxString dataOverride;
     wxString selfTestReport;
+    wxString gitSelfTestReport;
     wxString editorSelfTestReport;
     wxString benchInput;
     wxString benchReport;
@@ -111,6 +113,8 @@ bool PenDownApp::OnInit() {
             dataOverride = argv[++i];
         } else if (arg == "--selftest" && i + 1 < argc) {
             selfTestReport = argv[++i];
+        } else if (arg == "--git-selftest" && i + 1 < argc) {
+            gitSelfTestReport = argv[++i];
         } else if (arg == "--editor-selftest" && i + 1 < argc) {
             editorSelfTestReport = argv[++i];
         } else if (arg == "--editor-bench" && i + 2 < argc) {
@@ -122,6 +126,12 @@ bool PenDownApp::OnInit() {
     if (!selfTestReport.empty()) {
         const bool ok = RunSelfTest(ToW(selfTestReport));
         SetErrorExitCode(ok ? 0 : 1);
+        return false;
+    }
+
+    if (!gitSelfTestReport.empty()) {
+        const int exitCode = RunGitSelfTest(ToW(gitSelfTestReport));
+        SetErrorExitCode(exitCode);
         return false;
     }
 

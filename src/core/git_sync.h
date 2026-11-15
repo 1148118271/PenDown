@@ -32,7 +32,8 @@ class GitSync {
 public:
     using ProgressFn = std::function<void(const std::wstring&)>;
 
-    GitSync(std::wstring dataDir, GitSyncConfig config);
+    GitSync(std::wstring dataDir, GitSyncConfig config,
+            std::wstring backupRoot = {});
 
     GitSyncResult Push(const ProgressFn& progress = {});
     GitSyncResult Pull(const ProgressFn& progress = {});

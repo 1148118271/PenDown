@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 
-project(PenDown VERSION 1.0.0 LANGUAGES CXX)
+project(PenDown VERSION 1.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -166,6 +166,15 @@ add_test(
 set_tests_properties(PenDown.EditorSelfTest PROPERTIES
     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
     TIMEOUT 120)
+
+add_test(
+    NAME PenDown.GitSelfTest
+    COMMAND $<TARGET_FILE:PenDown> --git-selftest
+            "${CMAKE_CURRENT_BINARY_DIR}/git-selftest-$<CONFIG>.txt")
+set_tests_properties(PenDown.GitSelfTest PROPERTIES
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+    TIMEOUT 300
+    SKIP_RETURN_CODE 77)
 
 find_program(PENDOWN_POWERSHELL NAMES pwsh powershell)
 if(PENDOWN_POWERSHELL)

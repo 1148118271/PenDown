@@ -7,16 +7,13 @@
 #include <wx/fontdlg.h>
 #include <wx/frame.h>
 #include <wx/msgdlg.h>
-#include <wx/settings.h>
 #include <wx/stopwatch.h>
 #include <wx/textdlg.h>
 #include <wx/utils.h>
 
 #include <algorithm>
-#include <cstdlib>
 #include <filesystem>
 #include <fstream>
-#include <limits>
 #include <sstream>
 #include <vector>
 

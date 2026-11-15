@@ -64,11 +64,6 @@ IconButton::IconButton(wxWindow* parent, wxWindowID id, AppIcon icon,
     });
 }
 
-void IconButton::SetIcon(AppIcon icon) {
-    icon_ = icon;
-    Refresh();
-}
-
 void IconButton::SetActive(bool active) {
     if (active_ == active) return;
     active_ = active;

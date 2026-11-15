@@ -64,7 +64,7 @@ add_executable(PenDown WIN32 ${PENDOWN_SOURCES})
 target_include_directories(PenDown PRIVATE src res)
 target_link_libraries(PenDown PRIVATE ${PENDOWN_WX_LIBS})
 if(WIN32)
-    target_link_libraries(PenDown PRIVATE dwmapi crypt32)
+    target_link_libraries(PenDown PRIVATE dwmapi crypt32 shell32)
 endif()
 
 target_compile_definitions(PenDown PRIVATE

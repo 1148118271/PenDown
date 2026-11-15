@@ -3,6 +3,7 @@
 #include "core/note_storage.h"
 
 #include <windows.h>
+#include <shellapi.h>
 
 #include <algorithm>
 #include <cwctype>
@@ -106,6 +107,79 @@ bool IsReservedFileName(const std::wstring& name) {
     }
     return false;
 }
+
+// 标题没变时，当前文件名可能只是上次重名时生成的 “标题 (2).txt”。
+// 判断 stem 是否等于 base 或 base + " (n)"，避免同名便签每次保存都换成新的 (n)。
+bool IsSameTitleVariant(const std::wstring& stem, const std::wstring& base) {
+    const std::wstring lowerStem = Lower(stem);
+    const std::wstring lowerBase = Lower(base);
+    if (lowerStem == lowerBase) return true;
+
+    const std::wstring prefix = lowerBase + L" (";
+    if (lowerStem.size() <= prefix.size() + 1) return false;
+    if (lowerStem.compare(0, prefix.size(), prefix) != 0) return false;
+    if (lowerStem.back() != L')') return false;
+
+    const std::wstring digits =
+        lowerStem.substr(prefix.size(), lowerStem.size() - prefix.size() - 1);
+    for (wchar_t ch : digits) {
+        if (ch < L'0' || ch > L'9') return false;
+    }
+    return true;
+}
+
+std::vector<fs::path> ExistingPaths(const std::vector<fs::path>& candidates) {
+    std::vector<fs::path> existing;
+    existing.reserve(candidates.size());
+    for (const fs::path& path : candidates) {
+        std::error_code ec;
+        if (!path.empty() && fs::exists(path, ec)) existing.push_back(path);
+    }
+    return existing;
+}
+
+#ifdef _WIN32
+// 网络位置没有回收站；提前拒绝，避免 SHFileOperation 静默永久删除。
+bool IsRecycleBinAvailable(const fs::path& path, std::wstring& error) {
+    const std::wstring root = path.root_path().wstring();
+    if (root.empty()) {
+        error = L"无法确定删除位置所在的磁盘。";
+        return false;
+    }
+    const UINT type = ::GetDriveTypeW(root.c_str());
+    if (type == DRIVE_FIXED || type == DRIVE_REMOVABLE) return true;
+    error = L"当前位置不在本地磁盘上，回收站不可用；请在资源管理器中手动删除。";
+    return false;
+}
+
+// 把一组文件/目录一起移到回收站，保证正文和样式 sidecar 可以一起还原。
+// 失败时不会删除任何内容，由调用方决定是否提示用户手动处理。
+bool MoveToRecycleBin(const std::vector<fs::path>& paths, std::wstring& error) {
+    if (paths.empty()) return true;
+    for (const fs::path& path : paths) {
+        if (!IsRecycleBinAvailable(path, error)) return false;
+    }
+
+    std::wstring from;
+    for (const fs::path& path : paths) {
+        from += path.wstring();
+        from.push_back(L'\0');
+    }
+    from.push_back(L'\0');
+
+    SHFILEOPSTRUCTW operation = {};
+    operation.wFunc = FO_DELETE;
+    operation.pFrom = from.c_str();
+    operation.fFlags = static_cast<FILEOP_FLAGS>(
+        FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_SILENT | FOF_NOERRORUI);
+    const int result = ::SHFileOperationW(&operation);
+    if (result == 0 && !operation.fAnyOperationsAborted) return true;
+
+    error = result == 0 ? L"删除操作已取消"
+                        : L"移入回收站失败（错误代码 " + std::to_wstring(result) + L"）";
+    return false;
+}
+#endif
 
 }  // namespace
 
@@ -338,7 +412,8 @@ bool NoteStore::MoveGroup(const std::wstring& relPath, const std::wstring& newPa
     return true;
 }
 
-bool NoteStore::DeleteGroup(const std::wstring& relPath, std::wstring& error) {
+bool NoteStore::DeleteGroup(const std::wstring& relPath, std::wstring& error,
+                            NoteDeleteMode mode) {
     if (!IsSafeRelative(relPath) || relPath.empty()) {
         error = L"分组路径无效";
         return false;
@@ -347,6 +422,15 @@ bool NoteStore::DeleteGroup(const std::wstring& relPath, std::wstring& error) {
     std::error_code ec;
     fs::path target = fs::path(AbsolutePath(relPath));
     if (!fs::exists(target, ec)) return true;
+
+#ifdef _WIN32
+    if (mode == NoteDeleteMode::RecycleBin) {
+        return MoveToRecycleBin({target}, error);
+    }
+#else
+    (void)mode;
+#endif
+
     fs::remove_all(target, ec);
     if (ec) {
         error = L"删除分组目录失败：" + target.wstring();
@@ -423,10 +507,17 @@ bool NoteStore::SaveNote(const std::wstring& relPath, const std::wstring& groupR
     fs::path desired = groupDir / (base + extension);
     fs::path target = desired;
     bool caseOnlyRename = false;
+    const bool currentInGroup =
+        currentExists && SamePath(current.parent_path(), groupDir);
     if (currentExists && SamePath(desired, current)) {
         // 先写回原文件，写完后再单独处理大小写改名。
         caseOnlyRename =
             desired.filename().wstring() != current.filename().wstring();
+        target = current;
+    } else if (currentInGroup &&
+               IsSameTitleVariant(current.stem().wstring(), base)) {
+        // 标题没变，当前文件名只是上次重名时自动生成的 “标题 (2).txt”：
+        // 继续沿用，避免每次保存都换成 “标题 (3)”“标题 (4)”。
         target = current;
     } else if (fs::exists(desired, ec)) {
         std::wstring unique = UniqueName(groupDir, base, extension);
@@ -545,21 +636,48 @@ bool NoteStore::MoveNote(const std::wstring& relPath, const std::wstring& newGro
     return true;
 }
 
-bool NoteStore::DeleteNote(const std::wstring& relPath, std::wstring& error) {
+bool NoteStore::DeleteNote(const std::wstring& relPath, std::wstring& error,
+                           NoteDeleteMode mode) {
     if (!IsSafeRelative(relPath) || relPath.empty()) {
         error = L"便签路径无效";
         return false;
     }
-    std::error_code ec;
+
     fs::path target = fs::path(AbsolutePath(relPath));
-    if (!fs::exists(target, ec)) return true;
-    fs::remove(target, ec);
-    if (ec) {
-        error = L"删除便签文件失败：" + target.wstring();
-        return false;
+    const std::wstring stylePath = NoteStorage::StylePath(target.wstring());
+
+    // 正文、样式、自动保存和上一版备份一起处理，避免删除后留下孤儿文件，
+    // 也保证从回收站还原时样式仍然跟着正文。
+    std::vector<fs::path> files = ExistingPaths({
+        target,
+        fs::path(stylePath),
+        fs::path(NoteStorage::AutosavePath(target.wstring())),
+        fs::path(NoteStorage::AutosaveStylePath(target.wstring())),
+        fs::path(target.wstring() + L".tmp"),
+        fs::path(stylePath + L".tmp"),
+        fs::path(target.wstring() + L".bak"),
+        fs::path(stylePath + L".bak"),
+    });
+    if (files.empty()) return true;
+
+#ifdef _WIN32
+    if (mode == NoteDeleteMode::RecycleBin) {
+        return MoveToRecycleBin(files, error);
     }
-    fs::remove(fs::path(NoteStorage::StylePath(target.wstring())), ec);
-    return true;
+#else
+    (void)mode;
+#endif
+
+    bool ok = true;
+    for (const fs::path& file : files) {
+        std::error_code removeError;
+        fs::remove(file, removeError);
+        if (removeError && ok) {
+            error = L"删除文件失败：" + file.wstring();
+            ok = false;
+        }
+    }
+    return ok;
 }
 
 std::wstring NoteStore::DeriveTitle(const std::wstring& text) {

@@ -12,15 +12,12 @@
 #include "ui/ui_ids.h"
 #include "ui/window_effects.h"
 
-#include <wx/button.h>
 #include <wx/datetime.h>
 #include <wx/display.h>
 #include <wx/msgdlg.h>
 #include <wx/panel.h>
 #include <wx/sizer.h>
-#include <wx/statbmp.h>
 #include <wx/stattext.h>
-#include <wx/utils.h>
 
 #ifdef __WXMSW__
 #include <wx/msw/wrapwin.h>
@@ -83,7 +80,6 @@ NoteWindow::NoteWindow(wxWindow* parent, std::shared_ptr<NoteStore> store,
       onSaved_(std::move(onSaved)),
       onDeleted_(std::move(onDeleted)),
       onClosed_(std::move(onClosed)),
-      lastColour_(Theme::Text()),
       statusTimer_(this, kStatusTimerId),
       autosaveTimer_(this, kAutosaveTimerId),
       hintTimer_(this, kHintTimerId) {
@@ -183,14 +179,6 @@ void NoteWindow::BuildUi() {
     titleBar->SetBackgroundColour(Theme::Surface());
     auto* titleOuter = new wxBoxSizer(wxVERTICAL);
     auto* bar = new wxBoxSizer(wxHORIZONTAL);
-
-    wxBitmap formatBitmap =
-        IconLibrary::Get(AppIcon::Note, FromDIP(18), Theme::TextMuted());
-    wxStaticBitmap* formatIcon = nullptr;
-    if (formatBitmap.IsOk()) {
-        formatIcon = new wxStaticBitmap(titleBar, wxID_ANY, formatBitmap);
-        bar->Add(formatIcon, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, FromDIP(8));
-    }
     bar->AddSpacer(FromDIP(8));
 
     const wxSize buttonSize = FromDIP(wxSize(26, 22));
@@ -264,10 +252,6 @@ void NoteWindow::BuildUi() {
     auto toggleMax = [this](wxMouseEvent&) { Maximize(!IsMaximized()); };
     titleBar->Bind(wxEVT_LEFT_DOWN, beginDrag);
     titleBar->Bind(wxEVT_LEFT_DCLICK, toggleMax);
-    if (formatIcon) {
-        formatIcon->Bind(wxEVT_LEFT_DOWN, beginDrag);
-        formatIcon->Bind(wxEVT_LEFT_DCLICK, toggleMax);
-    }
 #endif
 
     auto* editorHost = new wxPanel(content);
@@ -486,7 +470,7 @@ void NoteWindow::ScheduleAutosave() {
 
 void NoteWindow::DeleteNote() {
     if (notePath_.empty()) {
-        const int answer = wxMessageBox(L"确定删除当前便签？\n删除后无法恢复。",
+        const int answer = wxMessageBox(L"当前便签还没有保存，关闭后内容不会保留。是否继续？",
                                         L"删除便签",
                                         wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION,
                                         this);
@@ -500,7 +484,7 @@ void NoteWindow::DeleteNote() {
 
     wxString title = FromW(title_.empty() ? L"无标题便签" : title_);
     const int answer = wxMessageBox(wxString(L"删除便签「") + title +
-                                        L"」？\n删除后无法恢复。",
+                                        L"」？\n删除后会移到回收站，可在回收站中找回。",
                                     L"删除便签",
                                     wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION, this);
     if (answer != wxYES) return;
@@ -626,7 +610,6 @@ void NoteWindow::ApplyColour(const wxColour& colour, bool clear,
         editor_->ApplyBackground(colour, clear);
     } else {
         editor_->ApplyForeground(colour, clear);
-        if (!clear) lastColour_ = colour;
     }
     UpdateStatus();
     UpdateFormatPainterState();
@@ -703,7 +686,7 @@ void NoteWindow::UpdateFormatPainterState() {
 void NoteWindow::UpdateStatus() {
     if (!status_ || !editor_) return;
     statusTimer_.Stop();
-    wxString text = L"富文本";
+    wxString text = L"文本";
     if (notePath_.empty() && !dirty_) {
         text += L" · 新建";
     } else {

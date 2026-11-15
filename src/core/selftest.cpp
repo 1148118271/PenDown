@@ -111,7 +111,8 @@ bool RunSelfTest(const std::wstring& reportPath) {
               L"rename case-only note");
         check(fs::path(caseNoteRenamed).filename().wstring() == L"casenote.txt",
               L"case-only note on disk");
-        check(store.DeleteNote(caseNoteRenamed, error), L"delete case note");
+        check(store.DeleteNote(caseNoteRenamed, error, NoteDeleteMode::Permanent),
+              L"delete case note");
 
         std::wstring caseGroup;
         check(store.CreateGroup(L"", L"CaseGroup", caseGroup, error),
@@ -124,7 +125,8 @@ bool RunSelfTest(const std::wstring& reportPath) {
             if (entry.path().filename().wstring() == L"casegroup") caseExact = true;
         }
         check(caseExact, L"case-only group on disk");
-        check(store.DeleteGroup(caseRenamed, error), L"delete case group");
+        check(store.DeleteGroup(caseRenamed, error, NoteDeleteMode::Permanent),
+              L"delete case group");
 
         std::wstring workRel;
         check(store.CreateGroup(L"", L"工作", workRel, error), L"create root group");
@@ -283,7 +285,8 @@ bool RunSelfTest(const std::wstring& reportPath) {
               L"style sidecar moved");
         check(store.MoveNote(movedStyled, L"", styledPath, error),
               L"move styled note back");
-        check(store.DeleteNote(styledPath, error), L"delete styled note");
+        check(store.DeleteNote(styledPath, error, NoteDeleteMode::Permanent),
+              L"delete styled note");
         check(!fs::exists(styledJson), L"style sidecar removed");
 
         check(store.ListTree(groups, notes, error) && notes.size() == 2,
@@ -310,7 +313,13 @@ bool RunSelfTest(const std::wstring& reportPath) {
                              duplicatePath, error),
               L"save duplicate title");
         check(duplicatePath != renamedPath, L"duplicate title unique");
-        check(store.DeleteNote(duplicatePath, error), L"delete duplicate note");
+        std::wstring duplicateResaved;
+        check(store.SaveNote(duplicatePath, projectRel, ToUtf8(changed), L"新标题",
+                             duplicateResaved, error) &&
+                  duplicateResaved == duplicatePath,
+              L"duplicate title keeps existing path");
+        check(store.DeleteNote(duplicatePath, error, NoteDeleteMode::Permanent),
+              L"delete duplicate note");
 
         // 旧版 .wxr 不再作为便签列出，但文件本身必须保留。
         const fs::path legacyRich = dataDir / L"工作" / L"旧版便签.wxr";
@@ -354,9 +363,11 @@ bool RunSelfTest(const std::wstring& reportPath) {
               L"move group back");
         check(fs::is_directory(dataDir / renamedGroup), L"group back folder");
 
-        check(store.DeleteGroup(workRel, error), L"delete group tree");
+        check(store.DeleteGroup(workRel, error, NoteDeleteMode::Permanent),
+              L"delete group tree");
         check(!fs::exists(dataDir / workRel), L"group folder removed");
-        check(store.DeleteNote(rootNote, error), L"delete root note");
+        check(store.DeleteNote(rootNote, error, NoteDeleteMode::Permanent),
+              L"delete root note");
         check(store.ListTree(groups, notes, error) && groups.empty() && notes.empty(),
               L"tree after delete");    }
 

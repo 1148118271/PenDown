@@ -85,7 +85,6 @@ private:
     ColorPopup* colorPopup_ = nullptr;
     StylePopup* stylePopup_ = nullptr;
     FindReplaceDialog* findDialog_ = nullptr;
-    wxColour lastColour_;
     long popupSelectionStart_ = -1;
     long popupSelectionEnd_ = -1;
     wxString autosaveLabel_;

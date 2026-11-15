@@ -19,6 +19,13 @@ struct NoteFileEntry {
     std::wstring title;
 };
 
+// 删除方式。默认把便签/分组移到 Windows 回收站，误删后可以找回；
+// 自检等批量场景可以显式使用 Permanent。
+enum class NoteDeleteMode {
+    RecycleBin,
+    Permanent,
+};
+
 // 便签存储：data 目录下每个文件夹就是一个分组，每个 .txt 文件就是一条便签。
 // 正文不写入 Markdown 语法；颜色/字体等样式保存在 sidecar JSON。
 // 旧版 .md 文件不再列出，也不会被删除，方便用户自行转换。
@@ -37,7 +44,8 @@ public:
                      std::wstring& newRel, std::wstring& error);
     bool MoveGroup(const std::wstring& relPath, const std::wstring& newParentRel,
                    std::wstring& newRel, std::wstring& error);
-    bool DeleteGroup(const std::wstring& relPath, std::wstring& error);
+    bool DeleteGroup(const std::wstring& relPath, std::wstring& error,
+                     NoteDeleteMode mode = NoteDeleteMode::RecycleBin);
 
     bool ReadNote(const std::wstring& relPath, std::string& bytes, std::wstring& error) const;
     bool LoadNoteDocument(const std::wstring& relPath, std::string& text,
@@ -60,7 +68,8 @@ public:
                           StyleModel& styles, std::wstring& warning) const;
     bool MoveNote(const std::wstring& relPath, const std::wstring& newGroupRel,
                   std::wstring& newRel, std::wstring& error);
-    bool DeleteNote(const std::wstring& relPath, std::wstring& error);
+    bool DeleteNote(const std::wstring& relPath, std::wstring& error,
+                    NoteDeleteMode mode = NoteDeleteMode::RecycleBin);
 
     static std::wstring DeriveTitle(const std::wstring& text);
 

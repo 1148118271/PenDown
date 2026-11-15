@@ -1,6 +1,9 @@
 ﻿build/
 out/
 .vs/
+.cache/
+.clangd
+.zed/
 *.user
 *.suo
 *.VC.db

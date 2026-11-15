@@ -22,6 +22,7 @@ PenDown 是一个便携的 Windows 桌面便签工具，只做便签这一件事
 - 启动时默认在主显示器居中打开；如果上次在副屏，下次会回到主屏
 - 分组可以无限嵌套；便签是叶子节点
 - 右键菜单支持新建子分组、新建便签、重命名、移动到分组、删除
+- 删除便签或分组会移到 Windows 回收站，误删后可以还原；删除分组会连同其中的子分组和便签一起移动
 - 主窗口和便签窗口都可以拖动四周边缘或四角调整大小
 - `Del` 删除，`F2` 重命名 / 打开便签，`F5` 刷新
 - `Ctrl+N` 新建便签，`Ctrl+Shift+N` 新建分组
@@ -225,6 +226,21 @@ cmake --preset system
 cmake --build --preset system-release
 ```
 
+### 在 Zed / clangd 中开发
+
+项目默认使用 Visual Studio 生成器，不会输出 `compile_commands.json`。clangd 缺少该文件时，会找不到 wxWidgets、MSVC 和 Windows SDK 的头文件，编辑器里出现大量红色错误。执行一次：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools/setup-clangd.ps1
+```
+
+脚本会：
+
+- 用 Ninja + MSVC 配置 `build/clangd`，生成 `compile_commands.json`
+- 在项目根目录生成本机专用的 `.clangd`，补充 MSVC / Windows SDK 系统头文件路径
+
+`.clangd` 含本机绝对路径，已加入 `.gitignore`，不要提交。之后重启 Zed，或执行 `clangd: Restart language server` 即可。
+
 ## 自检
 
 ```powershell
@@ -238,7 +254,7 @@ PenDown.exe --editor-selftest editor-selftest.txt
 PenDown.exe --editor-bench 50mb.txt bench.txt
 ```
 
-报告文件为 UTF-8，以 `OK` 或 `FAIL` 开头。`--selftest` 覆盖根目录便签、嵌套分组、移动、重命名、第一行标题、TXT/JSON 样式往返、链接独立存储、旧格式 URL 迁移与重复样式去重、样式文件删除和旧文件忽略；`--editor-selftest` 覆盖 wxStyledTextCtrl 文本往返、中文/Emoji 字节偏移、选区样式、样式槽与预定义槽保留、链接区间编辑与热点、行高回收、换行、查找和替换。
+报告文件为 UTF-8，以 `OK` 或 `FAIL` 开头。`--selftest` 覆盖根目录便签、嵌套分组、移动、重命名、第一行标题、重复标题复用已有文件名、TXT/JSON 样式往返、链接独立存储、旧格式 URL 迁移与重复样式去重、样式文件删除和旧文件忽略；`--editor-selftest` 覆盖 wxStyledTextCtrl 文本往返、中文/Emoji 字节偏移、选区样式、样式槽与预定义槽保留、链接区间编辑与热点、行高回收、换行、查找和替换。
 
 ## 性能验证
 
@@ -306,6 +322,8 @@ PenDown/
 │     └─ ui_ids.h              # 控件 / 命令 ID
 ├─ res/                        # 图标、清单、版本信息
 │  └─ icons/                   # Lucide SVG
+├─ tools/
+│  └─ setup-clangd.ps1         # 生成 compile_commands.json 和本机 .clangd
 └─ docs/                       # README 截图（旧版，待更新）
 ```
 
@@ -318,6 +336,14 @@ PenDown/
 ### 关闭主窗口后程序去哪了？
 
 程序会隐藏到系统托盘，已经打开的便签窗口仍会保持打开。托盘图标右键菜单里有“打开 PenDown”和“关闭”。只有“关闭”才会真正退出并关闭所有窗口。
+
+### 删除的便签可以恢复吗？
+
+可以。删除便签或分组时会移到 Windows 回收站，打开回收站即可还原；删除分组时，其中的子分组和便签会一起移动。只有清空回收站后才会真正删除。
+
+如果数据目录位于网络驱动器等没有回收站的位置，删除会失败并提示，请改用资源管理器手动删除，程序不会静默永久删除。
+
+Git 拉取不属于这个流程：它按远程分支覆盖本地，会删除不在远程里的本地文件，但覆盖前会自动备份到 `%LOCALAPPDATA%\PenDown\backups`。
 
 ### 可以同时开多个 PenDown 吗？
 

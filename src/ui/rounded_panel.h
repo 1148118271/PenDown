@@ -9,8 +9,6 @@ class wxBoxSizer;
 class RoundedPanel : public wxPanel {
 public:
     explicit RoundedPanel(wxWindow* parent, int radius = 7, int padding = 6);
-    // 允许上下与左右使用不同内边距，编辑区可以更贴边。
-    RoundedPanel(wxWindow* parent, int radius, int paddingX, int paddingY);
 
     void AddContent(wxWindow* content, int proportion = 1);
 

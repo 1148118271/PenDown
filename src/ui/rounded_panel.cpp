@@ -7,9 +7,6 @@
 #include <wx/sizer.h>
 
 RoundedPanel::RoundedPanel(wxWindow* parent, int radius, int padding)
-    : RoundedPanel(parent, radius, padding, padding) {}
-
-RoundedPanel::RoundedPanel(wxWindow* parent, int radius, int paddingX, int paddingY)
     : wxPanel(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxFULL_REPAINT_ON_RESIZE),
       radius_(radius) {
     SetBackgroundColour(Theme::Surface());
@@ -18,14 +15,14 @@ RoundedPanel::RoundedPanel(wxWindow* parent, int radius, int paddingX, int paddi
     contentSizer_ = new wxBoxSizer(wxVERTICAL);
 
     auto* row = new wxBoxSizer(wxHORIZONTAL);
-    row->AddSpacer(FromDIP(paddingX));
+    row->AddSpacer(FromDIP(padding));
     row->Add(contentSizer_, 1, wxEXPAND);
-    row->AddSpacer(FromDIP(paddingX));
+    row->AddSpacer(FromDIP(padding));
 
     auto* root = new wxBoxSizer(wxVERTICAL);
-    root->AddSpacer(FromDIP(paddingY));
+    root->AddSpacer(FromDIP(padding));
     root->Add(row, 1, wxEXPAND);
-    root->AddSpacer(FromDIP(paddingY));
+    root->AddSpacer(FromDIP(padding));
     SetSizer(root);
 
     Bind(wxEVT_PAINT, &RoundedPanel::OnPaint, this);

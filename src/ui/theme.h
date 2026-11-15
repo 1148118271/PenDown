@@ -9,7 +9,6 @@ namespace Theme {
 inline wxColour Background() { return wxColour(255, 255, 255); }   // #FFFFFF
 inline wxColour Surface() { return wxColour(255, 255, 255); }      // #FFFFFF
 inline wxColour Border() { return wxColour(216, 208, 199); }       // #D8D0C7
-inline wxColour BorderStrong() { return wxColour(199, 189, 178); } // #C7BDB2
 inline wxColour Text() { return wxColour(43, 39, 35); }            // #2B2723
 inline wxColour TextMuted() { return wxColour(110, 103, 95); }     // #6E675F
 inline wxColour TextFaint() { return wxColour(166, 158, 148); }    // #A69E94

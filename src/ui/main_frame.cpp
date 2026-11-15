@@ -114,16 +114,9 @@ void CenterOnPrimary(wxWindow* window) {
 }
 
 wxSize DefaultWindowSize(wxWindow* window) {
-    const wxRect workArea = PrimaryWorkArea();
-    int minWidth = window->FromDIP(320);
-    int minHeight = window->FromDIP(540);
-    int width = std::min(window->FromDIP(440), (int)(workArea.width * 0.33));
-    int height = std::min(window->FromDIP(760), workArea.height - window->FromDIP(24));
-    width = std::max(width, minWidth);
-    height = std::max(height, minHeight);
-    width = std::min(width, workArea.width);
-    height = std::min(height, workArea.height);
-    return wxSize(width, height);
+    // 默认尺寸与最小尺寸一致，首次启动保持紧凑；用户之后调整的大小
+    // 会由 RestoreLayout() 恢复。
+    return window->FromDIP(wxSize(320, 540));
 }
 
 }  // namespace
@@ -168,8 +161,9 @@ MainFrame::MainFrame(std::shared_ptr<NoteStore> store)
               wxBORDER_NONE | wxRESIZE_BORDER | wxCLIP_CHILDREN),
       store_(std::move(store)) {
     SetBackgroundColour(Theme::Background());
-    SetSize(DefaultWindowSize(this));
-    SetMinSize(FromDIP(wxSize(320, 540)));
+    const wxSize defaultSize = DefaultWindowSize(this);
+    SetSize(defaultSize);
+    SetMinSize(defaultSize);
 
     BuildUi();
     BindEvents();
@@ -1297,7 +1291,7 @@ void MainFrame::DeleteGroup(const std::wstring& groupPath) {
     CollectGroupTree(targetPath, subtree);
     int answer = wxMessageBox(
         wxString(L"删除分组「") + FromW(GroupName(targetPath)) +
-            L"」及其中所有子分组和便签？\n删除后无法恢复。",
+            L"」及其中所有子分组和便签？\n删除后会移到回收站，可在回收站中找回。",
         L"删除分组", wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION, this);
     if (answer != wxYES) return;
 
@@ -1328,7 +1322,8 @@ void MainFrame::DeleteNote(const std::wstring& notePath) {
     std::wstring title = note->title;
     std::wstring groupPath = note->group_path;
 
-    int answer = wxMessageBox(wxString(L"删除便签「") + FromW(title) + L"」？\n删除后无法恢复。",
+    int answer = wxMessageBox(wxString(L"删除便签「") + FromW(title) +
+                                  L"」？\n删除后会移到回收站，可在回收站中找回。",
                               L"删除便签", wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION, this);
     if (answer != wxYES) return;
 

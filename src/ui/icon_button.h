@@ -17,7 +17,6 @@ public:
                Kind kind = Kind::Normal, const wxSize& size = wxDefaultSize,
                int iconSize = 18);
 
-    void SetIcon(AppIcon icon);
     void SetEventTarget(wxEvtHandler* target) { eventTarget_ = target; }
     void SetActive(bool active);
 

@@ -2,6 +2,7 @@
 
 #include "ui/app_font.h"
 #include "ui/theme.h"
+#include "ui/ui_text.h"
 
 #include <wx/dcbuffer.h>
 #include <wx/graphics.h>
@@ -25,30 +26,30 @@ struct SwatchEntry {
 
 const std::vector<SwatchEntry>& CommonColours() {
     static const std::vector<SwatchEntry> kColours = {
-        {L"清除颜色", wxColour(), true},
-        {L"默认黑色", wxColour(0x2B, 0x27, 0x23)},
-        {L"灰色", wxColour(0x6E, 0x67, 0x5F)},
-        {L"浅灰", wxColour(0xA6, 0x9E, 0x94)},
-        {L"红色", wxColour(0xE4, 0x56, 0x49)},
-        {L"橙色", wxColour(0xE6, 0x7E, 0x22)},
-        {L"琥珀色", wxColour(0xD9, 0xA4, 0x00)},
-        {L"黄色", wxColour(0xCA, 0x8A, 0x04)},
-        {L"绿色", wxColour(0x50, 0xA1, 0x4F)},
-        {L"深绿色", wxColour(0x16, 0x65, 0x34)},
-        {L"青色", wxColour(0x0F, 0x9D, 0x8A)},
-        {L"天蓝色", wxColour(0x0E, 0xA5, 0xE9)},
-        {L"蓝色", wxColour(0x25, 0x63, 0xEB)},
-        {L"深蓝色", wxColour(0x1E, 0x3A, 0x8A)},
-        {L"靛蓝色", wxColour(0x63, 0x66, 0xF1)},
-        {L"紫色", wxColour(0xA6, 0x26, 0xA4)},
-        {L"粉色", wxColour(0xD9, 0x46, 0x8F)},
-        {L"玫瑰色", wxColour(0xE1, 0x1D, 0x48)},
-        {L"深红色", wxColour(0x99, 0x1B, 0x1B)},
-        {L"棕色", wxColour(0xA0, 0x52, 0x2D)},
-        {L"石板灰", wxColour(0x47, 0x55, 0x69)},
-        {L"深青色", wxColour(0x0F, 0x76, 0x6E)},
-        {L"深紫色", wxColour(0x6B, 0x21, 0xA8)},
-        {L"暖灰色", wxColour(0x8A, 0x81, 0x78)},
+        {UiText("color.clear_color"), wxColour(), true},
+        {UiText("color.default_black"), wxColour(0x2B, 0x27, 0x23)},
+        {UiText("color.gray"), wxColour(0x6E, 0x67, 0x5F)},
+        {UiText("color.light_gray"), wxColour(0xA6, 0x9E, 0x94)},
+        {UiText("color.red"), wxColour(0xE4, 0x56, 0x49)},
+        {UiText("color.orange"), wxColour(0xE6, 0x7E, 0x22)},
+        {UiText("color.amber"), wxColour(0xD9, 0xA4, 0x00)},
+        {UiText("color.yellow"), wxColour(0xCA, 0x8A, 0x04)},
+        {UiText("color.green"), wxColour(0x50, 0xA1, 0x4F)},
+        {UiText("color.dark_green"), wxColour(0x16, 0x65, 0x34)},
+        {UiText("color.cyan"), wxColour(0x0F, 0x9D, 0x8A)},
+        {UiText("color.sky_blue"), wxColour(0x0E, 0xA5, 0xE9)},
+        {UiText("color.blue"), wxColour(0x25, 0x63, 0xEB)},
+        {UiText("color.dark_blue"), wxColour(0x1E, 0x3A, 0x8A)},
+        {UiText("color.indigo"), wxColour(0x63, 0x66, 0xF1)},
+        {UiText("color.purple"), wxColour(0xA6, 0x26, 0xA4)},
+        {UiText("color.pink"), wxColour(0xD9, 0x46, 0x8F)},
+        {UiText("color.rose"), wxColour(0xE1, 0x1D, 0x48)},
+        {UiText("color.dark_red"), wxColour(0x99, 0x1B, 0x1B)},
+        {UiText("color.brown"), wxColour(0xA0, 0x52, 0x2D)},
+        {UiText("color.slate_gray"), wxColour(0x47, 0x55, 0x69)},
+        {UiText("color.dark_cyan"), wxColour(0x0F, 0x76, 0x6E)},
+        {UiText("color.dark_purple"), wxColour(0x6B, 0x21, 0xA8)},
+        {UiText("color.warm_gray"), wxColour(0x8A, 0x81, 0x78)},
     };
     return kColours;
 }
@@ -122,7 +123,8 @@ private:
 };
 
 ColorPopup::ColorPopup(wxWindow* parent, const wxColour& initial, ApplyHandler apply)
-    : wxMiniFrame(parent, wxID_ANY, L"颜色", wxDefaultPosition, wxDefaultSize,
+    : wxMiniFrame(parent, wxID_ANY, UiText("color.color"), wxDefaultPosition,
+                  wxDefaultSize,
                   wxCAPTION | wxCLOSE_BOX | wxFRAME_FLOAT_ON_PARENT),
       apply_(std::move(apply)),
       colour_(initial.IsOk() ? initial : Theme::Text()),
@@ -148,8 +150,9 @@ void ColorPopup::BuildUi() {
     const int margin = FromDIP(14);
 
     auto* targetRow = new wxBoxSizer(wxHORIZONTAL);
-    textButton_ = new wxToggleButton(this, wxID_ANY, L"文字");
-    backgroundButton_ = new wxToggleButton(this, wxID_ANY, L"背景");
+    textButton_ = new wxToggleButton(this, wxID_ANY, UiText("color.text"));
+    backgroundButton_ =
+        new wxToggleButton(this, wxID_ANY, UiText("color.background"));
     textButton_->SetFont(AppFont::Make(std::max(8, AppFont::BasePointSize() - 1)));
     backgroundButton_->SetFont(
         AppFont::Make(std::max(8, AppFont::BasePointSize() - 1)));
@@ -164,7 +167,8 @@ void ColorPopup::BuildUi() {
         SetTarget(ColorTarget::Background);
     });
 
-    auto* commonLabel = new wxStaticText(this, wxID_ANY, L"常用颜色");
+    auto* commonLabel =
+        new wxStaticText(this, wxID_ANY, UiText("color.common_colors"));
     commonLabel->SetForegroundColour(Theme::TextMuted());
     commonLabel->SetFont(AppFont::Make(AppFont::BasePointSize() - 1, true));
     root->Add(commonLabel, 0, wxLEFT | wxRIGHT | wxTOP, margin);
@@ -181,7 +185,8 @@ void ColorPopup::BuildUi() {
     }
     root->Add(grid, 0, wxALIGN_CENTER_HORIZONTAL | wxTOP, FromDIP(8));
 
-    auto* customLabel = new wxStaticText(this, wxID_ANY, L"自定义颜色");
+    auto* customLabel =
+        new wxStaticText(this, wxID_ANY, UiText("color.custom_color"));
     customLabel->SetForegroundColour(Theme::TextMuted());
     customLabel->SetFont(AppFont::Make(AppFont::BasePointSize() - 1, true));
     root->Add(customLabel, 0, wxLEFT | wxRIGHT | wxTOP, margin);

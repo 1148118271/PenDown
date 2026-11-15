@@ -35,6 +35,7 @@ set(PENDOWN_SOURCES
     src/app.cpp
 
     src/core/note_store.cpp
+    src/core/i18n.cpp
     src/core/text.cpp
     src/core/selftest.cpp
     src/core/git_sync.cpp
@@ -43,6 +44,8 @@ set(PENDOWN_SOURCES
     src/core/note_storage.cpp
 
     src/ui/main_frame.cpp
+    src/ui/dialogs.cpp
+    src/ui/language_config.cpp
     src/ui/note_tree_ctrl.cpp
     src/ui/note_window.cpp
     src/ui/note_editor.cpp
@@ -124,6 +127,20 @@ endif()
                     "$<TARGET_FILE_DIR:PenDown>/icons"
             VERBATIM)
         install(FILES ${PENDOWN_ICON_FILES} DESTINATION icons)
+    endif()
+
+    # 界面文案单独放在 lang/，修改翻译不需要重新编译。
+    file(GLOB PENDOWN_LANG_FILES CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/lang/*.lang")
+    if(PENDOWN_LANG_FILES)
+        add_custom_command(TARGET PenDown POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory
+                    "$<TARGET_FILE_DIR:PenDown>/lang"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    ${PENDOWN_LANG_FILES}
+                    "$<TARGET_FILE_DIR:PenDown>/lang"
+            VERBATIM)
+        install(FILES ${PENDOWN_LANG_FILES} DESTINATION lang)
     endif()
 endif()
 

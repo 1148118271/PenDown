@@ -1,0 +1,878 @@
+# PenDown language file: 简体中文
+# UTF-8. 值必须用双引号；换行写成 \n，引号写成 \"，反斜杠写成 \\。
+
+# Failed to initialize the notes folder:\n
+app.failed_to_initialize_the_notes_folder="初始化便签目录失败：\n"
+
+# The configured data folder is unavailable:\n
+app.the_configured_data_folder_is_unavailable="配置的数据目录不可用：\n"
+
+# \n\nUsing the default folder for now:\n
+app.using_the_default_folder_for_now="\n\n已临时使用默认目录：\n"
+
+# Amber
+color.amber="琥珀色"
+
+# Background
+color.background="背景"
+
+# Blue
+color.blue="蓝色"
+
+# Brown
+color.brown="棕色"
+
+# Clear color
+color.clear_color="清除颜色"
+
+# Color
+color.color="颜色"
+
+# Common colors
+color.common_colors="常用颜色"
+
+# Custom color
+color.custom_color="自定义颜色"
+
+# Cyan
+color.cyan="青色"
+
+# Dark blue
+color.dark_blue="深蓝色"
+
+# Dark cyan
+color.dark_cyan="深青色"
+
+# Dark green
+color.dark_green="深绿色"
+
+# Dark purple
+color.dark_purple="深紫色"
+
+# Dark red
+color.dark_red="深红色"
+
+# Default black
+color.default_black="默认黑色"
+
+# Gray
+color.gray="灰色"
+
+# Green
+color.green="绿色"
+
+# Indigo
+color.indigo="靛蓝色"
+
+# Light gray
+color.light_gray="浅灰"
+
+# Orange
+color.orange="橙色"
+
+# Pink
+color.pink="粉色"
+
+# Purple
+color.purple="紫色"
+
+# Red
+color.red="红色"
+
+# Rose
+color.rose="玫瑰色"
+
+# Sky blue
+color.sky_blue="天蓝色"
+
+# Slate gray
+color.slate_gray="石板灰"
+
+# Text
+color.text="文字"
+
+# Warm gray
+color.warm_gray="暖灰色"
+
+# Yellow
+color.yellow="黄色"
+
+# %ld character / %ld characters
+count.characters="%ld 字"
+
+# %ld group / %ld groups
+count.groups="%ld 组"
+
+# %ld note / %ld notes
+count.notes="%ld 条"
+
+# Cancel
+dialogs.cancel="取消"
+
+# No
+dialogs.no="否"
+
+# OK
+dialogs.ok="确定"
+
+# Yes
+dialogs.yes="是"
+
+# Insert link
+editor.insert_link="插入链接"
+
+# Link address
+editor.link_address="链接地址"
+
+# Select the text to turn into a link first.
+editor.select_the_text_to_turn_into_a_link_first="请先选择要设置为链接的文字。"
+
+# Close
+find.close="关闭"
+
+# Find
+find.find="查找"
+
+# Find next
+find.find_next="查找下一个"
+
+# Find / Replace
+find.find_replace="查找 / 替换"
+
+# Match case
+find.match_case="区分大小写"
+
+# Replace
+find.replace="替换"
+
+# Replace all
+find.replace_all="全部替换"
+
+# Replace with
+find.replace_with="替换为"
+
+# Replaced %ld occurrence. / Replaced %ld occurrences.
+find.replaced_count="已替换 %ld 处。"
+
+# Whole word
+find.whole_word="全字匹配"
+
+# Cannot access the application configuration.
+git_config.cannot_access_the_application_configuration="无法访问程序配置。"
+
+# Failed to encrypt the access token; the configuration was not saved.
+git_config.failed_to_encrypt_the_access_token_the_configura="无法加密访问令牌，配置未保存。"
+
+# Failed to save the Git configuration.
+git_config.failed_to_save_the_git_configuration="保存 Git 配置失败。"
+
+# A username is required when using a password or access token.
+git_sync.a_username_is_required_when_using_a_password_or="使用密码或访问令牌时，必须填写用户名。"
+
+# \nAvailable branches: 
+git_sync.available_branches="\n可用分支："
+
+# Backing up local notes...
+git_sync.backing_up_local_notes="正在备份本地便签..."
+
+# \n\nBackup restore failed: 
+git_sync.backup_restore_failed="\n\n备份还原失败："
+
+# Branch 
+git_sync.branch="远程仓库中不存在分支 "
+
+# Branch: 
+git_sync.branch_2="分支："
+
+# Cannot connect to the remote repository. Check the repository URL, credentials and network.
+git_sync.cannot_connect_to_the_remote_repository_check_th="无法连接远程仓库。请检查仓库地址、账号和网络。"
+
+# Cannot create the backup folder: 
+git_sync.cannot_create_the_backup_folder="无法创建备份目录："
+
+# Cannot create the folder: 
+git_sync.cannot_create_the_folder="无法创建目录："
+
+# Cannot create the Git error pipe.
+git_sync.cannot_create_the_git_error_pipe="无法创建 Git 错误管道。"
+
+# Cannot create the Git output pipe.
+git_sync.cannot_create_the_git_output_pipe="无法创建 Git 输出管道。"
+
+# Cannot delete: 
+git_sync.cannot_delete="无法删除："
+
+# Cannot read the folder: 
+git_sync.cannot_read_the_folder="无法读取目录："
+
+# Cannot start git.exe (error code 
+git_sync.cannot_start_git_exe_error_code="无法启动 git.exe（错误代码 "
+
+# \nCommit: 
+git_sync.commit="\n提交："
+
+# Committing local changes...
+git_sync.committing_local_changes="正在提交本地更改..."
+
+#  does not exist in the remote repository.
+git_sync.does_not_exist_in_the_remote_repository="。"
+
+# Enter the Git branch name.
+git_sync.enter_the_git_branch_name="请填写 Git 分支名称。"
+
+# Enter the Git repository URL first.
+git_sync.enter_the_git_repository_url_first="请先填写 Git 仓库地址。"
+
+# Failed to clear the local notes folder; attempted to restore from the backup.
+git_sync.failed_to_clear_the_local_notes_folder_attempted="清空本地便签目录失败，已尝试从备份还原。"
+
+# Failed to configure the remote repository.
+git_sync.failed_to_configure_the_remote_repository="配置远程仓库失败。"
+
+# Failed to copy the file: 
+git_sync.failed_to_copy_the_file="复制文件失败："
+
+# Failed to create a local backup; the pull was canceled.
+git_sync.failed_to_create_a_local_backup_the_pull_was_can="创建本地备份失败，已取消拉取。"
+
+# Failed to create the local commit.
+git_sync.failed_to_create_the_local_commit="创建本地提交失败。"
+
+# Failed to initialize the local Git repository.
+git_sync.failed_to_initialize_the_local_git_repository="初始化本地 Git 仓库失败。"
+
+# Failed to push to the remote repository.
+git_sync.failed_to_push_to_the_remote_repository="推送到远程仓库失败。"
+
+# Failed to read sync status.
+git_sync.failed_to_read_sync_status="读取同步状态失败。"
+
+# Failed to read the folder: 
+git_sync.failed_to_read_the_folder="读取目录失败："
+
+# Failed to stage local files.
+git_sync.failed_to_stage_local_files="暂存本地文件失败。"
+
+# Failed to update local files from the remote; attempted to restore from the backup.
+git_sync.failed_to_update_local_files_from_the_remote_att="从远程更新本地文件失败，已尝试从备份还原。"
+
+# git.exe was not found.
+git_sync.git_exe_was_not_found="未找到 git.exe"
+
+# git.exe was not found.\nInstall Git for Windows or enter the actual path to git.exe in Settings.
+git_sync.git_exe_was_not_found_install_git_for_windows_or="未找到 git.exe。\n请安装 Git for Windows，或在设置中填写 git.exe 的实际路径。"
+
+# Git exit code: 
+git_sync.git_exit_code="Git 退出码："
+
+# Git pull failed.
+git_sync.git_pull_failed="Git 拉取失败。"
+
+# Initializing local Git repository...
+git_sync.initializing_local_git_repository="正在初始化本地 Git 仓库..."
+
+# No new local changes; the remote branch was force-updated to match the local state.
+git_sync.no_new_local_changes_the_remote_branch_was_force="本地没有新改动，远程分支已强制更新为本地状态。"
+
+# Operation timed out (over 10 minutes).\n
+git_sync.operation_timed_out_over_10_minutes="操作超时（超过 10 分钟）。\n"
+
+# Overwriting local content with the remote state...
+git_sync.overwriting_local_content_with_the_remote_state="正在用远程内容覆盖本地..."
+
+# Pulled from the remote repository; the local content now matches the remote state.
+git_sync.pulled_from_the_remote_repository_the_local_cont="已从远程仓库拉取，本地内容已变为远程状态。"
+
+# Pushed to the remote repository; the remote now matches the local state.
+git_sync.pushed_to_the_remote_repository_the_remote_now_m="已推送到远程仓库，远程内容已变为本地状态。"
+
+# Pushing to the remote repository...
+git_sync.pushing_to_the_remote_repository="正在推送到远程仓库..."
+
+# Reading the remote repository...
+git_sync.reading_the_remote_repository="正在读取远程仓库..."
+
+# ).
+git_sync.text="）。"
+
+# The configured Git executable does not exist:\n
+git_sync.the_configured_git_executable_does_not_exist="配置的 Git 程序不存在：\n"
+
+# The folder does not exist: 
+git_sync.the_folder_does_not_exist="目录不存在："
+
+# The Git backup folder cannot be inside the note data folder.
+git_sync.the_git_backup_folder_cannot_be_inside_the_note="Git 备份目录不能位于便签数据目录内部。"
+
+# The note data folder cannot be a drive root.
+git_sync.the_note_data_folder_cannot_be_a_drive_root="便签数据目录不能是磁盘根目录。"
+
+# The note data folder does not exist: 
+git_sync.the_note_data_folder_does_not_exist="便签数据目录不存在："
+
+# There are no note files to push.
+git_sync.there_are_no_note_files_to_push="本地没有可推送的便签文件。"
+
+# " and all its subgroups and notes?\nThey will be moved to the Recycle Bin and can be restored from there.
+main.and_all_its_subgroups_and_notes_they_will_be_mov="」及其中所有子分组和便签？\n删除后会移到回收站，可在回收站中找回。"
+
+# Cannot create the data folder:\n
+main.cannot_create_the_data_folder="无法创建数据目录：\n"
+
+# Change data folder
+main.change_data_folder="更改数据目录"
+
+# Choose a target group:
+main.choose_a_target_group="选择目标分组："
+
+# Copy the current notes to the new folder?\n\nChoose No to switch folders only; the original notes stay where they are.
+main.copy_the_current_notes_to_the_new_folder_choose="是否把当前便签复制到新目录？\n\n选择“否”只切换目录，原便签会保留在原位置。"
+
+# Delete group
+main.delete_group="删除分组"
+
+# Delete note
+main.delete_note="删除便签"
+
+# Delete the group "
+main.delete_the_group="删除分组「"
+
+# Delete the note "
+main.delete_the_note="删除便签「"
+
+# Delete the selected group or note (Del)
+main.delete_the_selected_group_or_note_del="删除选中的分组或便签 (Del)"
+
+# Different actions cannot use the same shortcut.
+main.different_actions_cannot_use_the_same_shortcut="不同操作不能使用相同的快捷键。"
+
+# Exit
+main.exit="关闭"
+
+# Failed to copy note data. The original data was not changed.
+main.failed_to_copy_note_data_the_original_data_was_n="复制便签数据失败，旧数据未改动。"
+
+# Failed to create the group:\n
+main.failed_to_create_the_group="新建分组失败：\n"
+
+# Failed to delete the group:\n
+main.failed_to_delete_the_group="删除分组失败：\n"
+
+# Failed to delete the note:\n
+main.failed_to_delete_the_note="删除便签失败：\n"
+
+# Failed to move the group:\n
+main.failed_to_move_the_group="移动分组失败：\n"
+
+# Failed to move the note:\n
+main.failed_to_move_the_note="移动便签失败：\n"
+
+# Failed to read the notes folder:\n
+main.failed_to_read_the_notes_folder="读取便签目录失败：\n"
+
+# Failed to rename the group:\n
+main.failed_to_rename_the_group="重命名分组失败：\n"
+
+# Failed to save the language setting.
+main.failed_to_save_the_language_setting="无法保存语言设置。"
+
+# Failed to switch the data folder:\n
+main.failed_to_switch_the_data_folder="切换数据目录失败：\n"
+
+# Git settings
+main.git_settings="Git 配置"
+
+# Group: 
+main.group="分组："
+
+# Group name
+main.group_name="分组名称"
+
+# Invalid shortcut format. Please set it again.
+main.invalid_shortcut_format_please_set_it_again="快捷键格式无效，请重新设置。"
+
+# " is already used by another program. Choose another one.
+main.is_already_used_by_another_program_choose_anothe="」已被其他程序占用，请换一个。"
+
+# "?\nIt will be moved to the Recycle Bin and can be restored from there.
+main.it_will_be_moved_to_the_recycle_bin_and_can_be_r="」？\n删除后会移到回收站，可在回收站中找回。"
+
+# Language changed. Restart PenDown to apply it.
+main.language_changed_restart_pendown_to_apply_it="语言已更改，重启 PenDown 后生效。"
+
+# Maximize / restore
+main.maximize_restore="最大化 / 还原"
+
+# Minimize
+main.minimize="最小化"
+
+# Move to group...
+main.move_to_group="移动到分组..."
+
+# Move to group
+main.move_to_group_2="移动到分组"
+
+# New group
+main.new_group="新建分组"
+
+# New group (Ctrl+Shift+N): adds a subgroup under the selected group
+main.new_group_ctrl_shift_n_adds_a_subgroup_under_the="新建分组 (Ctrl+Shift+N)：选中分组时在其下新增子分组"
+
+# New note
+main.new_note="新建便签"
+
+# New note (Ctrl+N): created at the root when no group is selected
+main.new_note_ctrl_n_created_at_the_root_when_no_grou="新建便签 (Ctrl+N)：未选分组时创建在根目录"
+
+# New note in this group
+main.new_note_in_this_group="在此分组新建便签"
+
+# New note (root)
+main.new_note_root="新建便签（根目录）"
+
+# New subgroup
+main.new_subgroup="新建子分组"
+
+# No group: notes go to the root
+main.no_group_notes_go_to_the_root="未选分组：新便签将创建在根目录"
+
+# No group (root folder)
+main.no_group_root_folder="不选分组（根目录）"
+
+# No parent (root group)
+main.no_parent_root_group="不选上级（根分组）"
+
+# No target groups are available.
+main.no_target_groups_are_available="没有可用的目标分组。"
+
+# Note
+main.note="便签"
+
+# Note: 
+main.note_2="便签："
+
+# Open note
+main.open_note="打开便签"
+
+# Open PenDown
+main.open_pendown="打开 PenDown"
+
+# Rename group
+main.rename_group="重命名分组"
+
+# Settings
+main.settings="设置"
+
+# Show main window
+main.show_main_window="显示主窗口"
+
+# Some note windows are still open. The data folder was not changed.
+main.some_note_windows_are_still_open_the_data_folder="仍有便签窗口未关闭，数据目录未修改。"
+
+# The data folder cannot be empty.
+main.the_data_folder_cannot_be_empty="数据目录不能为空。"
+
+# The new data folder cannot be inside the old one, or vice versa.
+main.the_new_data_folder_cannot_be_inside_the_old_one="新数据目录不能位于旧数据目录内部，反之亦然。"
+
+# The notes were copied to the new folder; the old folder is kept as a backup.
+main.the_notes_were_copied_to_the_new_folder_the_old="现有便签已复制到新目录，旧目录保留作为备份。"
+
+# The shortcut "
+main.the_shortcut="快捷键「"
+
+# The target folder already contains files.\n\nPenDown will use it as-is and will not merge or overwrite existing notes.\n\nContinue?
+main.the_target_folder_already_contains_files_pendown="目标目录已有内容。\n\n切换后将直接使用该目录，不会自动合并或覆盖现有便签。\n\n是否继续？"
+
+# This group has open notes.\nThey will be closed before renaming. Continue?
+main.this_group_has_open_notes_they_will_be_closed_be="这个分组里有打开的便签。\n重命名前会先关闭这些窗口，是否继续？"
+
+# Enter a name
+name.enter_a_name="输入名称"
+
+# The name cannot be empty
+name.the_name_cannot_be_empty="名称不能为空"
+
+# An autosaved version from the last session was found. Restore it?
+note.an_autosaved_version_from_the_last_session_was_f="发现上次退出前自动保存的内容，是否恢复？"
+
+# Autosaved 
+note.autosaved="自动保存 "
+
+# Clear formatting: restore default font, size, color and links
+note.clear_formatting_restore_default_font_size_color="清除样式：恢复默认字体、字号、颜色和链接"
+
+# Untitled
+note.default_group="未命名"
+
+# Untitled
+note.default_title="无标题便签"
+
+# Failed to read the note:\n
+note.failed_to_read_the_note="读取便签失败：\n"
+
+# Failed to save the note:\n
+note.failed_to_save_the_note="保存便签失败：\n"
+
+# Format painter: canceled
+note.format_painter_canceled="格式刷：已取消"
+
+# Format painter: copy the current format, then select the target text
+note.format_painter_copy_the_current_format_then_sele="格式刷：先复制当前格式，再选中目标文字"
+
+# Format painter: format copied. Select the target text and release the mouse to apply it.
+note.format_painter_format_copied_select_the_target_t="格式刷：已复制格式，选择目标文字后松开鼠标即可应用"
+
+# Format painter: formatting applied
+note.format_painter_formatting_applied="格式刷：已应用格式"
+
+# Formatting cleared
+note.formatting_cleared="已清除样式"
+
+#  · New
+note.new=" · 新建"
+
+# Save note (Ctrl+S)
+note.save_note_ctrl_s="保存便签 (Ctrl+S)"
+
+#  · Saved
+note.saved=" · 已保存"
+
+# Style library: font, size, bold, italic and more
+note.style_library_font_size_bold_italic_and_more="样式库：字体、字号、加粗、斜体等"
+
+# Text
+note.text="文本"
+
+# Text color / background color
+note.text_color_background_color="文字颜色 / 背景色"
+
+# The note could not be read. To avoid overwriting the original file, it will not be saved.\nBack up the original file before continuing.
+note.the_note_could_not_be_read_to_avoid_overwriting="便签读取失败，为避免覆盖原文件，本次不会保存。\n请先备份原文件后再处理。"
+
+# This file has unsaved changes. Save before closing?
+note.this_file_has_unsaved_changes_save_before_closin="当前文件未保存，是否保存后关闭？"
+
+# This note has not been saved yet. Its content will be lost when closed. Continue?
+note.this_note_has_not_been_saved_yet_its_content_wil="当前便签还没有保存，关闭后内容不会保留。是否继续？"
+
+#  · Unsaved
+note.unsaved=" · 未保存"
+
+# A style range has an invalid format; styles were ignored.
+note_storage.a_style_range_has_an_invalid_format_styles_were="样式区间格式无效，已忽略样式。"
+
+# A style range is out of bounds or not aligned to UTF-8 characters; styles were ignored.
+note_storage.a_style_range_is_out_of_bounds_or_not_aligned_to="样式区间越界或未对齐 UTF-8 字符，已忽略样式。"
+
+# Cannot read the file: 
+note_storage.cannot_read_the_file="无法读取文件："
+
+# Cannot write the file: 
+note_storage.cannot_write_the_file="无法写入文件："
+
+# Failed to read the style file; styles were ignored.
+note_storage.failed_to_read_the_style_file_styles_were_ignore="样式文件读取失败，已忽略样式。"
+
+# Failed to replace the file: 
+note_storage.failed_to_replace_the_file="替换文件失败："
+
+# Failed to write the file: 
+note_storage.failed_to_write_the_file="写入文件失败："
+
+# Link data is invalid; links were ignored.
+note_storage.link_data_is_invalid_links_were_ignored="链接数据无效，已忽略链接。"
+
+# Some styles exceeded the limit and were ignored.
+note_storage.some_styles_exceeded_the_limit_and_were_ignored="部分样式超出上限，已忽略。"
+
+# The style file does not match the note text; styles were ignored.
+note_storage.the_style_file_does_not_match_the_note_text_styl="样式文件与正文不匹配，已忽略样式。"
+
+# The style file has an invalid format; styles were ignored.
+note_storage.the_style_file_has_an_invalid_format_styles_were="样式文件格式无效，已忽略样式。"
+
+# The style file is missing the text checksum; styles were ignored.
+note_storage.the_style_file_is_missing_the_text_checksum_styl="样式文件缺少正文校验信息，已忽略样式。"
+
+# The style file uses a newer version; styles were ignored.
+note_storage.the_style_file_uses_a_newer_version_styles_were="样式文件版本较新，已忽略样式。"
+
+# A group cannot be moved into itself or one of its subgroups.
+note_store.a_group_cannot_be_moved_into_itself_or_one_of_it="不能把分组移动到自身或它的子分组下"
+
+# A group with the same name already exists.
+note_store.a_group_with_the_same_name_already_exists="同名分组已存在"
+
+# A group with the same name already exists in the target group.
+note_store.a_group_with_the_same_name_already_exists_in_the="目标分组下已存在同名分组"
+
+# A note with the same name already exists in the target group.
+note_store.a_note_with_the_same_name_already_exists_in_the="目标分组下已存在同名便签"
+
+# Cannot create the data folder: 
+note_store.cannot_create_the_data_folder="无法创建数据目录："
+
+# Cannot create the parent group folder.
+note_store.cannot_create_the_parent_group_folder="无法创建上级分组目录"
+
+# Cannot determine the drive for the deletion target.
+note_store.cannot_determine_the_drive_for_the_deletion_targ="无法确定删除位置所在的磁盘。"
+
+# Failed to create the group folder: 
+note_store.failed_to_create_the_group_folder="创建分组目录失败："
+
+# Failed to delete the file: 
+note_store.failed_to_delete_the_file="删除文件失败："
+
+# Failed to delete the group folder: 
+note_store.failed_to_delete_the_group_folder="删除分组目录失败："
+
+# Failed to delete the old note file: 
+note_store.failed_to_delete_the_old_note_file="旧便签文件删除失败："
+
+# Failed to move the group: 
+note_store.failed_to_move_the_group="移动分组失败："
+
+# Failed to move the note: 
+note_store.failed_to_move_the_note="移动便签失败："
+
+# Failed to move the style file: 
+note_store.failed_to_move_the_style_file="移动样式文件失败："
+
+# Failed to move to the Recycle Bin (error code 
+note_store.failed_to_move_to_the_recycle_bin_error_code="移入回收站失败（错误代码 "
+
+# Failed to read the note: 
+note_store.failed_to_read_the_note="读取便签失败："
+
+# Invalid group path.
+note_store.invalid_group_path="分组路径无效"
+
+# Invalid note path.
+note_store.invalid_note_path="便签路径无效"
+
+# Rename failed: 
+note_store.rename_failed="重命名失败："
+
+# The data folder is empty.
+note_store.the_data_folder_is_empty="数据目录为空"
+
+# The delete operation was canceled.
+note_store.the_delete_operation_was_canceled="删除操作已取消"
+
+# The group does not exist.
+note_store.the_group_does_not_exist="分组不存在"
+
+# The group folder does not exist: 
+note_store.the_group_folder_does_not_exist="分组目录不存在："
+
+# The group is already in that group.
+note_store.the_group_is_already_in_that_group="分组已经在该分组下"
+
+# The group name cannot be empty.
+note_store.the_group_name_cannot_be_empty="分组名称不能为空"
+
+# The location is not on a local drive, so the Recycle Bin is unavailable. Delete it manually in File Explorer.
+note_store.the_location_is_not_on_a_local_drive_so_the_recy="当前位置不在本地磁盘上，回收站不可用；请在资源管理器中手动删除。"
+
+# The note data folder is not initialized.
+note_store.the_note_data_folder_is_not_initialized="便签数据目录未初始化"
+
+# The note file does not exist.
+note_store.the_note_file_does_not_exist="便签文件不存在"
+
+# The note is already in that group.
+note_store.the_note_is_already_in_that_group="便签已经在该分组下"
+
+# The parent group does not exist.
+note_store.the_parent_group_does_not_exist="上级分组不存在"
+
+# The target group does not exist.
+note_store.the_target_group_does_not_exist="目标分组不存在"
+
+# Hello
+selftest.hello="你好"
+
+# Access token, encrypted and stored on this computer
+settings.access_token_encrypted_and_stored_on_this_comput="访问令牌，加密保存在本机"
+
+# An error occurred during Git sync.
+settings.an_error_occurred_during_git_sync="Git 同步过程中发生异常。"
+
+# An unknown error occurred during Git sync.
+settings.an_unknown_error_occurred_during_git_sync="Git 同步过程中发生未知异常。"
+
+# Branch
+settings.branch="分支"
+
+# Changing the language takes effect after restarting PenDown.
+settings.changing_the_language_takes_effect_after_restart="切换语言后需要重启 PenDown 才会生效。"
+
+# Choose data folder
+settings.choose_data_folder="选择数据目录"
+
+# Choose git.exe
+settings.choose_git_exe="选择 git.exe"
+
+# Choose note data folder
+settings.choose_note_data_folder="选择便签数据目录"
+
+# Click a field and press a key combination.\nCtrl / Alt / Shift can be combined with letters, numbers or F1–F12.\nF1–F12 can also be used alone. Leave empty to disable; shortcuts work while PenDown is in the tray.
+settings.click_a_field_and_press_a_key_combination_ctrl_a="点击输入框后按下组合键；\n支持 Ctrl / Alt / Shift 的任意组合 + 字母、数字或 F1–F12；\nF1–F12 也可以单独使用。留空表示不启用，程序隐藏到托盘时仍然有效。"
+
+# Close all note windows before pulling from the remote.
+settings.close_all_note_windows_before_pulling_from_the_r="请先关闭所有便签窗口，再执行“从远程拉取”。"
+
+# Data folder
+settings.data_folder="数据目录"
+
+# Data storage
+settings.data_storage="数据存储"
+
+# Full path to a local git.exe; leave empty to search PATH.
+settings.full_path_to_a_local_git_exe_leave_empty_to_sear="可填写本地 git.exe 的完整路径；留空则自动从 PATH 查找。"
+
+# Git: 
+settings.git="Git："
+
+# git.exe|git.exe|Executable files (*.exe)|*.exe|All files (*.*)|*.*
+settings.git_exe_git_exe_executable_files_exe_exe_all_fil="git.exe|git.exe|可执行文件 (*.exe)|*.exe|所有文件 (*.*)|*.*"
+
+# Git executable
+settings.git_executable="Git 程序"
+
+# Git executable not found: 
+settings.git_executable_not_found="Git 程序不存在："
+
+# Git sync
+settings.git_sync="Git 同步"
+
+# Git sync failed
+settings.git_sync_failed="Git 同步失败"
+
+# Git sync failed. Check the repository URL, Git path, credentials and network.
+settings.git_sync_failed_check_the_repository_url_git_pat="Git 同步失败，请检查仓库地址、Git 路径、账号和网络。"
+
+# Git was not detected. Enter the actual path to git.exe.
+settings.git_was_not_detected_enter_the_actual_path_to_gi="未检测到 Git，请填写 git.exe 的实际路径。"
+
+# Git was not detected. Install Git for Windows or enter the path to git.exe.
+settings.git_was_not_detected_install_git_for_windows_or="未检测到 Git，请安装 Git for Windows 或填写 git.exe 路径。"
+
+# Invalid shortcut format. Please enter it again.
+settings.invalid_shortcut_format_please_enter_it_again="快捷键格式无效，请重新录入。"
+
+# Keyboard shortcuts
+settings.keyboard_shortcuts="快捷键设置"
+
+# Language
+settings.language="界面语言"
+
+# Language
+settings.language_2="语言"
+
+# Leave empty to auto-detect, e.g. D:\Git\bin\git.exe
+settings.leave_empty_to_auto_detect_e_g_d_git_bin_git_exe="留空自动检测，例如 D:\\Git\\bin\\git.exe"
+
+# \n\nLocal backup:\n
+settings.local_backup="\n\n本地备份：\n"
+
+# Not set
+settings.not_set="未设置"
+
+# Notes are stored in the folder below. Click the folder icon to change it; the change takes effect the next time PenDown starts.\nHover over a long path to see it in full.
+settings.notes_are_stored_in_the_folder_below_click_the_f="便签保存在下面的目录；点击右侧文件夹图标更改，修改后下次启动仍然生效。\n路径较长时可悬停查看完整内容。"
+
+# Optional for public repositories
+settings.optional_for_public_repositories="公开仓库可留空"
+
+# Password / token
+settings.password_token="密码 / 令牌"
+
+# Preparing...
+settings.preparing="正在准备..."
+
+# Pull
+settings.pull="从远程拉取"
+
+# Pull: overwrite local content with the remote state; a backup is created first
+settings.pull_overwrite_local_content_with_the_remote_sta="从远程拉取：先用远程内容覆盖本地，拉取前自动备份"
+
+# Pull will overwrite local notes with the remote repository content.\nIf local and remote differ, the remote state wins; local data is backed up first.\n\nContinue?
+settings.pull_will_overwrite_local_notes_with_the_remote="拉取会用远程仓库内容强制覆盖本地便签。\n如果本地和远程不一致，以远程为准；覆盖前会自动备份本地数据。\n\n是否继续？"
+
+# Push
+settings.push="推送到远程"
+
+# Push: commit local changes and force-push; local replaces remote
+settings.push_commit_local_changes_and_force_push_local_r="推送到远程：提交本地改动并强制推送，本地覆盖远程"
+
+# Push will commit local changes and force-push them to the remote repository.\nIf local and remote differ, the local state wins and the remote content will be overwritten.\n\nContinue?
+settings.push_will_commit_local_changes_and_force_push_th="推送会提交本地改动并强制推送到远程仓库。\n如果远程和本地不一致，以本地为准，远程内容会被覆盖。\n\n是否继续？"
+
+# Repository URL
+settings.repository_url="仓库地址"
+
+# Save
+settings.save="保存"
+
+# Some note windows are open. Unsaved changes will not be included in the push.\n\nContinue?
+settings.some_note_windows_are_open_unsaved_changes_will="有打开的便签窗口，未保存的修改不会包含在推送内容中。\n\n是否继续？"
+
+# Sync now
+settings.sync_now="立即同步"
+
+# System default
+settings.system_default="跟随系统"
+
+# 中文
+settings.chinese="中文"
+
+# The data folder has changed. Save the settings before syncing with Git.
+settings.the_data_folder_has_changed_save_the_settings_be="数据目录已修改，请先保存设置，再执行 Git 同步。"
+
+# The entire data folder is a single Git repository: all groups, notes and other files are synced together.\nPush: commit local changes and force-push; the remote is replaced by the local state.\nPull: back up local data a
+settings.the_entire_data_folder_is_a_single_git_repositor="data 目录整体作为一个 Git 项目：所有分组、便签和其他文件都会一起同步。\n推送：提交本地改动后强制推送，远程以本地为准；\n拉取：先自动备份本地数据，再用远程内容强制覆盖本地。\n不做冲突合并。同步前请关闭所有便签窗口。"
+
+# The Git branch cannot be empty.
+settings.the_git_branch_cannot_be_empty="Git 分支不能为空。"
+
+# \n\nThe note list will refresh after closing settings.
+settings.the_note_list_will_refresh_after_closing_setting="\n\n关闭设置后便签列表会自动刷新。"
+
+# The specified Git executable does not exist:\n
+settings.the_specified_git_executable_does_not_exist="填写的 Git 程序不存在：\n"
+
+# Username
+settings.username="用户名"
+
+# Bold (Ctrl+B)
+style.bold_ctrl_b="加粗 (Ctrl+B)"
+
+# Choose font and size
+style.choose_font_and_size="字体字号选择"
+
+# Decrease font size
+style.decrease_font_size="字号减"
+
+# Hover over an icon to see its description
+style.hover_over_an_icon_to_see_its_description="悬停图标可查看说明"
+
+# Increase font size
+style.increase_font_size="字号加"
+
+# Italic (Ctrl+I)
+style.italic_ctrl_i="斜体 (Ctrl+I)"
+
+# Link: set a URL for the selected text
+style.link_set_a_url_for_the_selected_text="超链接：给选中文字设置网址"
+
+# Strikethrough
+style.strikethrough="删除线"
+
+# Styles
+style.styles="样式"
+
+# Underline (Ctrl+U)
+style.underline_ctrl_u="下划线 (Ctrl+U)"

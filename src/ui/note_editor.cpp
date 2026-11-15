@@ -2,7 +2,9 @@
 
 #include "core/note_storage.h"
 #include "ui/app_font.h"
+#include "ui/dialogs.h"
 #include "ui/theme.h"
+#include "ui/ui_text.h"
 
 #include <wx/fontdlg.h>
 #include <wx/frame.h>
@@ -550,11 +552,17 @@ void NoteEditor::ApplyCommand(FormatCommand command) {
         }
         case FormatCommand::Hyperlink: {
             if (!HasSelection()) {
-                wxMessageBox(L"请先选择要设置为链接的文字。", L"插入链接",
-                             wxOK | wxICON_INFORMATION, this);
+                dialogs::Message(
+                    this,
+                    UiText("editor.select_the_text_to_turn_into_a_link_first"),
+                    UiText("editor.insert_link"),
+                    wxOK | wxICON_INFORMATION);
                 break;
             }
-            wxTextEntryDialog dialog(this, L"链接地址", L"插入链接", L"https://");
+            wxTextEntryDialog dialog(
+                this, UiText("editor.link_address"),
+                UiText("editor.insert_link"), L"https://");
+            dialogs::LocalizeStandardButtons(&dialog);
             if (dialog.ShowModal() != wxID_OK) break;
             wxString url = dialog.GetValue();
             url.Trim(true).Trim(false);

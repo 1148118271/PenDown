@@ -5,6 +5,11 @@
 
 #include "core/style_model.h"
 
+// 磁盘上的默认标题/分组名保持稳定，不随界面语言变化，避免同一篇便签
+// 在不同语言环境下生成不同的文件名。英文界面只在显示层做本地化。
+inline constexpr wchar_t kDefaultNoteTitle[] = L"无标题便签";
+inline constexpr wchar_t kDefaultGroupName[] = L"未命名";
+
 // 文件系统里的一个分组目录。rel_path 相对 data 目录，例如「工作/项目 A」。
 struct NoteGroupEntry {
     std::wstring rel_path;

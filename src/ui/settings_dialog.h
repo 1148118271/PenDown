@@ -7,7 +7,9 @@
 #include <functional>
 
 #include "core/git_sync.h"
+#include "core/i18n.h"
 
+class wxChoice;
 class wxScrolledWindow;
 class wxStaticText;
 
@@ -45,13 +47,14 @@ class SettingsDialog : public wxDialog {
 public:
     SettingsDialog(wxWindow* parent, const wxString& dataDir,
                    const wxString& showMainHotkey, const wxString& newNoteHotkey,
-                   const GitSyncConfig& gitConfig,
+                   const GitSyncConfig& gitConfig, i18n::Language language,
                    std::function<bool()> hasOpenNotes);
 
     wxString DataDirectory() const;
     wxString ShowMainHotkey() const;
     wxString NewNoteHotkey() const;
     GitSyncConfig GitConfig() const;
+    i18n::Language Language() const;
     bool DidPull() const { return pulled_; }
 
 private:
@@ -76,9 +79,11 @@ private:
     wxTextCtrl* gitBranch_ = nullptr;
     HotkeyCtrl* showMain_ = nullptr;
     HotkeyCtrl* newNote_ = nullptr;
+    wxChoice* languageChoice_ = nullptr;
     wxStaticText* gitStatus_ = nullptr;
     wxStaticText* error_ = nullptr;
     std::function<bool()> hasOpenNotes_;
     wxString dataDir_;
+    i18n::Language languageSetting_ = i18n::Language::Auto;
     bool pulled_ = false;
 };

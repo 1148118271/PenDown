@@ -1,5 +1,7 @@
 #include "core/git_sync.h"
 
+#include "core/i18n.h"
+
 #include <windows.h>
 
 #include <algorithm>
@@ -215,7 +217,7 @@ RawProcessResult RunProcess(const std::wstring& exe,
                             const std::vector<std::pair<std::wstring, std::wstring>>& env) {
     RawProcessResult result;
     if (exe.empty()) {
-        result.error = L"未找到 git.exe";
+        result.error = i18n::Tr("git_sync.git_exe_was_not_found");
         return result;
     }
 
@@ -228,13 +230,13 @@ RawProcessResult RunProcess(const std::wstring& exe,
     HANDLE errRead = nullptr;
     HANDLE errWrite = nullptr;
     if (!::CreatePipe(&outRead, &outWrite, &security, 0)) {
-        result.error = L"无法创建 Git 输出管道。";
+        result.error = i18n::Tr("git_sync.cannot_create_the_git_output_pipe");
         return result;
     }
     if (!::CreatePipe(&errRead, &errWrite, &security, 0)) {
         ::CloseHandle(outRead);
         ::CloseHandle(outWrite);
-        result.error = L"无法创建 Git 错误管道。";
+        result.error = i18n::Tr("git_sync.cannot_create_the_git_error_pipe");
         return result;
     }
     ::SetHandleInformation(outRead, HANDLE_FLAG_INHERIT, 0);
@@ -271,8 +273,9 @@ RawProcessResult RunProcess(const std::wstring& exe,
     if (nullInput) ::CloseHandle(nullInput);
 
     if (!created) {
-        result.error = L"无法启动 git.exe（错误代码 " +
-                       std::to_wstring((unsigned long)::GetLastError()) + L"）。";
+        result.error = i18n::Tr("git_sync.cannot_start_git_exe_error_code") +
+                       std::to_wstring((unsigned long)::GetLastError()) +
+                       i18n::Tr("git_sync.text");
         ::CloseHandle(outRead);
         ::CloseHandle(errRead);
         return result;
@@ -414,12 +417,14 @@ bool MakeTreeWritable(const fs::path& root) {
 bool ClearDirectory(const fs::path& dir, std::wstring& error) {
     std::error_code ec;
     if (!fs::is_directory(dir, ec)) {
-        error = L"目录不存在：" + dir.wstring();
+        error = i18n::Tr("git_sync.the_folder_does_not_exist") +
+                dir.wstring();
         return false;
     }
     fs::directory_iterator iterator(dir, fs::directory_options::skip_permission_denied, ec);
     if (ec) {
-        error = L"无法读取目录：" + dir.wstring();
+        error = i18n::Tr("git_sync.cannot_read_the_folder") +
+                dir.wstring();
         return false;
     }
     for (const fs::directory_entry& entry : iterator) {
@@ -428,7 +433,8 @@ bool ClearDirectory(const fs::path& dir, std::wstring& error) {
         std::error_code removeError;
         fs::remove_all(entry.path(), removeError);
         if (removeError) {
-            error = L"无法删除：" + entry.path().wstring();
+            error = i18n::Tr("git_sync.cannot_delete") +
+                    entry.path().wstring();
             return false;
         }
     }
@@ -527,12 +533,14 @@ bool IsTransientGitFile(const std::string& path) {
 bool CopyTree(const fs::path& source, const fs::path& target, std::wstring& error) {
     std::error_code ec;
     if (!fs::is_directory(source, ec)) {
-        error = L"目录不存在：" + source.wstring();
+        error = i18n::Tr("git_sync.the_folder_does_not_exist") +
+                source.wstring();
         return false;
     }
     fs::create_directories(target, ec);
     if (ec) {
-        error = L"无法创建目录：" + target.wstring();
+        error = i18n::Tr("git_sync.cannot_create_the_folder") +
+                target.wstring();
         return false;
     }
 
@@ -541,7 +549,8 @@ bool CopyTree(const fs::path& source, const fs::path& target, std::wstring& erro
          end;
          it != end; it.increment(ec)) {
         if (ec) {
-            error = L"读取目录失败：" + source.wstring();
+            error = i18n::Tr("git_sync.failed_to_read_the_folder") +
+                    source.wstring();
             return false;
         }
         const fs::path& from = it->path();
@@ -566,7 +575,8 @@ bool CopyTree(const fs::path& source, const fs::path& target, std::wstring& erro
             }
         }
         if (ec) {
-            error = L"复制文件失败：" + from.wstring();
+            error = i18n::Tr("git_sync.failed_to_copy_the_file") +
+                    from.wstring();
             return false;
         }
     }
@@ -578,7 +588,8 @@ std::wstring CreateBackup(const fs::path& dataDir, const fs::path& backupRoot,
     std::error_code ec;
     fs::create_directories(backupRoot, ec);
     if (ec) {
-        error = L"无法创建备份目录：" + backupRoot.wstring();
+        error = i18n::Tr("git_sync.cannot_create_the_backup_folder") +
+                backupRoot.wstring();
         return std::wstring();
     }
 
@@ -670,38 +681,39 @@ GitSync::GitSync(std::wstring dataDir, GitSyncConfig config)
 
 bool GitSync::Validate(std::wstring& error) const {
     if (config_.remoteUrl.empty()) {
-        error = L"请先填写 Git 仓库地址。";
+        error = i18n::Tr("git_sync.enter_the_git_repository_url_first");
         return false;
     }
     if (config_.branch.empty()) {
-        error = L"请填写 Git 分支名称。";
+        error = i18n::Tr("git_sync.enter_the_git_branch_name");
         return false;
     }
     if (!config_.token.empty() && config_.username.empty()) {
-        error = L"使用密码或访问令牌时，必须填写用户名。";
+        error = i18n::Tr("git_sync.a_username_is_required_when_using_a_password_or");
         return false;
     }
 
     std::error_code ec;
     if (gitExe_.empty() || !fs::is_regular_file(gitExe_, ec)) {
         if (!config_.gitExe.empty()) {
-            error = L"配置的 Git 程序不存在：\n" + config_.gitExe;
+            error = i18n::Tr("git_sync.the_configured_git_executable_does_not_exist") +
+                    config_.gitExe;
         } else {
-            error = L"未找到 git.exe。\n请安装 Git for Windows，或在设置中填写 "
-                    L"git.exe 的实际路径。";
+            error = i18n::Tr("git_sync.git_exe_was_not_found_install_git_for_windows_or");
         }
         return false;
     }
     if (!fs::is_directory(dataDir_, ec)) {
-        error = L"便签数据目录不存在：" + dataDir_;
+        error = i18n::Tr("git_sync.the_note_data_folder_does_not_exist") +
+                dataDir_;
         return false;
     }
     if (!IsSafeDataDir(dataDir_)) {
-        error = L"便签数据目录不能是磁盘根目录。";
+        error = i18n::Tr("git_sync.the_note_data_folder_cannot_be_a_drive_root");
         return false;
     }
     if (IsSameOrChild(fs::path(backupRoot_), fs::path(dataDir_))) {
-        error = L"Git 备份目录不能位于便签数据目录内部。";
+        error = i18n::Tr("git_sync.the_git_backup_folder_cannot_be_inside_the_note");
         return false;
     }
     return true;
@@ -760,12 +772,14 @@ std::wstring GitSync::ErrorWithOutput(const std::wstring& message,
         output += errors;
     }
     if (result.timedOut) {
-        output = L"操作超时（超过 10 分钟）。\n" + output;
+        output = i18n::Tr("git_sync.operation_timed_out_over_10_minutes") +
+                 output;
     }
     output = LimitText(output, 2400);
     if (output.empty()) {
         if (result.exitCode != 0) {
-            output = L"Git 退出码：" + std::to_wstring(result.exitCode);
+            output = i18n::Tr("git_sync.git_exit_code") +
+                     std::to_wstring(result.exitCode);
         } else {
             return message;
         }
@@ -776,14 +790,17 @@ std::wstring GitSync::ErrorWithOutput(const std::wstring& message,
 bool GitSync::EnsureRepository(std::wstring& error) const {
     std::error_code ec;
     if (!fs::is_directory(dataDir_, ec)) {
-        error = L"便签数据目录不存在：" + dataDir_;
+        error = i18n::Tr("git_sync.the_note_data_folder_does_not_exist") +
+                dataDir_;
         return false;
     }
 
     if (!fs::exists(fs::path(dataDir_) / L".git", ec)) {
         const ProcessResult init = RunGit({L"init", L"-q"});
         if (!init.started || init.exitCode != 0) {
-            error = ErrorWithOutput(L"初始化本地 Git 仓库失败。", init);
+            error = ErrorWithOutput(
+                i18n::Tr("git_sync.failed_to_initialize_the_local_git_repository"),
+                init);
             return false;
         }
     }
@@ -794,7 +811,9 @@ bool GitSync::EnsureRepository(std::wstring& error) const {
         const ProcessResult addUrl =
             RunGit({L"remote", L"add", L"origin", config_.remoteUrl});
         if (!addUrl.started || addUrl.exitCode != 0) {
-            error = ErrorWithOutput(L"配置远程仓库失败。", addUrl);
+            error = ErrorWithOutput(
+                i18n::Tr("git_sync.failed_to_configure_the_remote_repository"),
+                addUrl);
             return false;
         }
     }
@@ -860,20 +879,26 @@ void GitSync::EnsureTransientFilesIgnored() const {
 GitSyncResult GitSync::Push(const ProgressFn& progress) {
     std::wstring error;
     if (!Validate(error)) return Failure(error);
-    if (progress) progress(L"正在初始化本地 Git 仓库...");
+    if (progress) {
+        progress(i18n::Tr("git_sync.initializing_local_git_repository"));
+    }
     if (!EnsureRepository(error)) return Failure(error);
 
-    if (progress) progress(L"正在提交本地更改...");
+    if (progress) {
+        progress(i18n::Tr("git_sync.committing_local_changes"));
+    }
     EnsureGroupMarkers(dataDir_);
     EnsureTransientFilesIgnored();
     const ProcessResult add = RunGit({L"add", L"-A"});
     if (!add.started || add.exitCode != 0) {
-        return Failure(ErrorWithOutput(L"暂存本地文件失败。", add));
+        return Failure(ErrorWithOutput(
+            i18n::Tr("git_sync.failed_to_stage_local_files"), add));
     }
 
     const ProcessResult status = RunGit({L"status", L"--porcelain"});
     if (!status.started || status.exitCode != 0) {
-        return Failure(ErrorWithOutput(L"读取同步状态失败。", status));
+        return Failure(ErrorWithOutput(
+            i18n::Tr("git_sync.failed_to_read_sync_status"), status));
     }
     const bool changed = !NormalizeOutput(status.stdoutText).empty();
     std::wstring commitMessage;
@@ -885,71 +910,101 @@ GitSyncResult GitSync::Push(const ProgressFn& progress) {
                     L"user.email=pendown@localhost", L"commit", L"-q", L"-m",
                     commitMessage});
         if (!commit.started || commit.exitCode != 0) {
-            return Failure(ErrorWithOutput(L"创建本地提交失败。", commit));
+            return Failure(ErrorWithOutput(
+                i18n::Tr("git_sync.failed_to_create_the_local_commit"),
+                commit));
         }
     }
 
     const ProcessResult head =
         RunGit({L"rev-parse", L"--verify", L"--quiet", L"HEAD"});
     if (!head.started || head.exitCode != 0) {
-        return Failure(L"本地没有可推送的便签文件。");
+        return Failure(i18n::Tr("git_sync.there_are_no_note_files_to_push"));
     }
 
-    if (progress) progress(L"正在推送到远程仓库...");
+    if (progress) {
+        progress(i18n::Tr("git_sync.pushing_to_the_remote_repository"));
+    }
     const std::wstring refspec = L"HEAD:refs/heads/" + config_.branch;
     const ProcessResult push = RunGit({L"push", L"--force", L"origin", refspec});
     if (!push.started || push.exitCode != 0) {
-        return Failure(ErrorWithOutput(L"推送到远程仓库失败。", push));
+        return Failure(ErrorWithOutput(
+            i18n::Tr("git_sync.failed_to_push_to_the_remote_repository"),
+            push));
     }
 
     GitSyncResult result;
     result.ok = true;
-    result.message = changed ? L"已推送到远程仓库，远程内容已变为本地状态。"
-                             : L"本地没有新改动，远程分支已强制更新为本地状态。";
-    result.details = L"分支：" + config_.branch;
-    if (changed) result.details += L"\n提交：" + commitMessage;
+    result.message =
+        changed ? i18n::Tr("git_sync.pushed_to_the_remote_repository_the_remote_now_m")
+                : i18n::Tr("git_sync.no_new_local_changes_the_remote_branch_was_force");
+    result.details = i18n::Tr("git_sync.branch_2") + config_.branch;
+    if (changed) {
+        result.details +=
+            i18n::Tr("git_sync.commit") + commitMessage;
+    }
     return result;
 }
 
 GitSyncResult GitSync::Pull(const ProgressFn& progress) {
     std::wstring error;
     if (!Validate(error)) return Failure(error);
-    if (progress) progress(L"正在初始化本地 Git 仓库...");
+    if (progress) {
+        progress(i18n::Tr("git_sync.initializing_local_git_repository"));
+    }
     if (!EnsureRepository(error)) return Failure(error);
 
-    if (progress) progress(L"正在读取远程仓库...");
+    if (progress) {
+        progress(i18n::Tr("git_sync.reading_the_remote_repository"));
+    }
     const ProcessResult fetch = RunGit({L"fetch", L"--prune", L"origin"});
     if (!fetch.started || fetch.exitCode != 0) {
         return Failure(ErrorWithOutput(
-            L"无法连接远程仓库。请检查仓库地址、账号和网络。", fetch));
+            i18n::Tr("git_sync.cannot_connect_to_the_remote_repository_check_th"),
+            fetch));
     }
 
     const std::wstring remoteRef = L"refs/remotes/origin/" + config_.branch;
     const ProcessResult exists =
         RunGit({L"show-ref", L"--verify", L"--quiet", remoteRef});
     if (!exists.started || exists.exitCode != 0) {
-        std::wstring message = L"远程仓库中不存在分支 " + config_.branch + L"。";
+        std::wstring message =
+            i18n::Tr("git_sync.branch") +
+            config_.branch +
+            i18n::Tr("git_sync.does_not_exist_in_the_remote_repository");
         const std::vector<std::wstring> branches = RemoteBranches();
-        if (!branches.empty()) message += L"\n可用分支：" + JoinBranches(branches);
+        if (!branches.empty()) {
+            message += i18n::Tr("git_sync.available_branches") +
+                       JoinBranches(branches);
+        }
         return Failure(message);
     }
 
-    if (progress) progress(L"正在备份本地便签...");
+    if (progress) {
+        progress(i18n::Tr("git_sync.backing_up_local_notes"));
+    }
     const std::wstring backup = CreateBackup(dataDir_, backupRoot_, error);
     if (backup.empty()) {
-        GitSyncResult result = Failure(L"创建本地备份失败，已取消拉取。", error);
+        GitSyncResult result = Failure(
+            i18n::Tr("git_sync.failed_to_create_a_local_backup_the_pull_was_can"),
+            error);
         return result;
     }
 
-    if (progress) progress(L"正在用远程内容覆盖本地...");
+    if (progress) {
+        progress(i18n::Tr("git_sync.overwriting_local_content_with_the_remote_state"));
+    }
     if (!ClearDirectory(dataDir_, error)) {
         std::wstring restoreError;
         CopyTree(backup, dataDir_, restoreError);
-        GitSyncResult result =
-            Failure(L"清空本地便签目录失败，已尝试从备份还原。", error);
+        GitSyncResult result = Failure(
+            i18n::Tr("git_sync.failed_to_clear_the_local_notes_folder_attempted"),
+            error);
         result.backupPath = backup;
         if (!restoreError.empty()) {
-            result.details += L"\n\n备份还原失败：" + restoreError;
+            result.details +=
+                i18n::Tr("git_sync.backup_restore_failed") +
+                restoreError;
         }
         return result;
     }
@@ -972,18 +1027,21 @@ GitSyncResult GitSync::Pull(const ProgressFn& progress) {
             CopyTree(backup, dataDir_, restoreError);
         }
         GitSyncResult result =
-            Failure(L"从远程更新本地文件失败，已尝试从备份还原。",
-                    ErrorWithOutput(L"Git 拉取失败。", checkout));
+            Failure(i18n::Tr("git_sync.failed_to_update_local_files_from_the_remote_att"),
+                    ErrorWithOutput(i18n::Tr("git_sync.git_pull_failed"),
+                                    checkout));
         result.backupPath = backup;
         if (!restoreError.empty()) {
-            result.details += L"\n\n备份还原失败：" + restoreError;
+            result.details +=
+                i18n::Tr("git_sync.backup_restore_failed") +
+                restoreError;
         }
         return result;
     }
 
     GitSyncResult result;
     result.ok = true;
-    result.message = L"已从远程仓库拉取，本地内容已变为远程状态。";
+    result.message = i18n::Tr("git_sync.pulled_from_the_remote_repository_the_local_cont");
     result.backupPath = backup;
     return result;
 }

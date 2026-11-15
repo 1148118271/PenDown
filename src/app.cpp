@@ -9,13 +9,17 @@
 
 #include <wx/file.h>
 
+#include "core/i18n.h"
 #include "core/note_store.h"
 #include "core/selftest.h"
 #include "core/text.h"
 #include "single_instance.h"
+#include "ui/dialogs.h"
 #include "ui/icon_library.h"
+#include "ui/language_config.h"
 #include "ui/main_frame.h"
 #include "ui/note_editor.h"
+#include "ui/ui_text.h"
 
 // PenDown：wxWidgets 的便签工具，便签正文以 .txt 保存在 data 目录，
 // 样式保存在同名 .txt.style.json。
@@ -87,6 +91,14 @@ bool PenDownApp::OnInit() {
     SetAppName("PenDown");
     wxInitAllImageHandlers();
 
+    wxFileName executable(wxStandardPaths::Get().GetExecutablePath());
+    const std::wstring languageDir = ToW(executable.GetPathWithSep() + L"lang");
+    i18n::LoadLanguageFile(languageDir + L"\\zh-CN.lang", i18n::Language::Chinese);
+    i18n::LoadLanguageFile(languageDir + L"\\en-US.lang", i18n::Language::English);
+
+    // 语言只影响界面文案；磁盘上的默认标题和文件名保持稳定。
+    ApplyLanguageSetting(LoadLanguageSetting());
+
     wxString dataOverride;
     wxString selfTestReport;
     wxString editorSelfTestReport;
@@ -134,7 +146,6 @@ bool PenDownApp::OnInit() {
     if (!ClaimSingleInstance()) return false;
 #endif
 
-    wxFileName executable(wxStandardPaths::Get().GetExecutablePath());
     const wxString defaultDataDir = executable.GetPathWithSep() + L"data";
     wxString dataDir = defaultDataDir;
     if (!dataOverride.empty()) {
@@ -153,18 +164,24 @@ bool PenDownApp::OnInit() {
         std::wstring fallbackError;
         if (dataOverride.empty() && !dataDir.IsSameAs(defaultDataDir, false) &&
             fallback->Open(ToW(defaultDataDir), fallbackError)) {
-            wxMessageBox(wxString(L"配置的数据目录不可用：\n") + dataDir +
-                             L"\n\n已临时使用默认目录：\n" + defaultDataDir,
-                         L"PenDown", wxOK | wxICON_WARNING);
+            dialogs::Message(
+                nullptr,
+                wxString(UiText("app.the_configured_data_folder_is_unavailable")) +
+                    dataDir +
+                    UiText("app.using_the_default_folder_for_now") +
+                    defaultDataDir,
+                L"PenDown", wxOK | wxICON_WARNING);
             store = fallback;
             if (wxConfigBase* config = wxConfigBase::Get()) {
                 config->Write("/Data/Directory", defaultDataDir);
                 config->Flush();
             }
         } else {
-            wxMessageBox(wxString(L"初始化便签目录失败：\n") + FromW(error) + L"\n\n" +
-                             dataDir,
-                         L"PenDown", wxOK | wxICON_ERROR);
+            dialogs::Message(
+                nullptr,
+                wxString(UiText("app.failed_to_initialize_the_notes_folder")) +
+                    FromW(error) + L"\n\n" + dataDir,
+                L"PenDown", wxOK | wxICON_ERROR);
             return false;
         }
     }

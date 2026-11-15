@@ -1,5 +1,7 @@
 ﻿#include "core/note_storage.h"
 
+#include "core/i18n.h"
+
 #include <algorithm>
 #include <cctype>
 #include <cstdint>
@@ -427,7 +429,7 @@ bool ParseStyleJson(const std::string& json, const std::string& text,
     std::string error;
     JsonParser parser(json);
     if (!parser.Parse(root, error)) {
-        warning = L"样式文件格式无效，已忽略样式。";
+        warning = i18n::Tr("note_storage.the_style_file_has_an_invalid_format_styles_were");
         styles.ClearRuns();
         return true;
     }
@@ -438,13 +440,13 @@ bool ParseStyleJson(const std::string& json, const std::string& text,
     const JsonValue* version = Field(root, "version");
     int64_t versionNumber = 0;
     if (version && AsInt(version, versionNumber) && versionNumber > 1) {
-        warning = L"样式文件版本较新，已忽略样式。";
+        warning = i18n::Tr("note_storage.the_style_file_uses_a_newer_version_styles_were");
         styles.ClearRuns();
         return true;
     }
     if (!body || !AsInt(Field(*body, "length"), length) ||
         !AsString(Field(*body, "hash"), hash)) {
-        warning = L"样式文件缺少正文校验信息，已忽略样式。";
+        warning = i18n::Tr("note_storage.the_style_file_is_missing_the_text_checksum_styl");
         styles.ClearRuns();
         return true;
     }
@@ -453,7 +455,7 @@ bool ParseStyleJson(const std::string& json, const std::string& text,
     hashText << std::hex << std::setw(16) << std::setfill('0')
              << NoteStorage::HashText(text);
     if (length != (int64_t)text.size() || hash != hashText.str()) {
-        warning = L"样式文件与正文不匹配，已忽略样式。";
+        warning = i18n::Tr("note_storage.the_style_file_does_not_match_the_note_text_styl");
         styles.ClearRuns();
         return true;
     }
@@ -495,14 +497,14 @@ bool ParseStyleJson(const std::string& json, const std::string& text,
         long lastEnd = 0;
         for (const JsonValue& item : runArray->array) {
             if (item.type != JsonValue::Type::Array || item.array.size() != 3) {
-                warning = L"样式区间格式无效，已忽略样式。";
+                warning = i18n::Tr("note_storage.a_style_range_has_an_invalid_format_styles_were");
                 styles.ClearRuns();
                 return true;
             }
             if (item.array[0].type != JsonValue::Type::Number ||
                 item.array[1].type != JsonValue::Type::Number ||
                 item.array[2].type != JsonValue::Type::Number) {
-                warning = L"样式区间格式无效，已忽略样式。";
+                warning = i18n::Tr("note_storage.a_style_range_has_an_invalid_format_styles_were");
                 styles.ClearRuns();
                 return true;
             }
@@ -511,13 +513,13 @@ bool ParseStyleJson(const std::string& json, const std::string& text,
             const long styleId = (long)item.array[2].number;
             if (start < lastEnd || end <= start || end > (long)text.size() ||
                 !IsUtf8Boundary(text, start) || !IsUtf8Boundary(text, end)) {
-                warning = L"样式区间越界或未对齐 UTF-8 字符，已忽略样式。";
+                warning = i18n::Tr("note_storage.a_style_range_is_out_of_bounds_or_not_aligned_to");
                 styles.ClearRuns();
                 return true;
             }
             if (styleId <= 0 || styleId >= (long)table.size()) {
                 // 超出当前样式上限：只丢这一段样式，不连累整篇便签。
-                warning = L"部分样式超出上限，已忽略。";
+                warning = i18n::Tr("note_storage.some_styles_exceeded_the_limit_and_were_ignored");
                 lastEnd = end;
                 continue;
             }
@@ -570,7 +572,9 @@ bool ParseStyleJson(const std::string& json, const std::string& text,
     }
     if (!linksValid) {
         links.clear();
-        if (warning.empty()) warning = L"链接数据无效，已忽略链接。";
+        if (warning.empty()) {
+            warning = i18n::Tr("note_storage.link_data_is_invalid_links_were_ignored");
+        }
     }
 
     styles.SetLoadedData(table, runs);
@@ -590,7 +594,7 @@ bool LoadPair(const std::wstring& bodyPath, const std::wstring& stylePath,
     }
     std::string json;
     if (!NoteStorage::ReadTextFile(stylePath, json, error)) {
-        warning = L"样式文件读取失败，已忽略样式。";
+        warning = i18n::Tr("note_storage.failed_to_read_the_style_file_styles_were_ignore");
         styles.ClearRuns();
         return true;
     }
@@ -624,7 +628,7 @@ bool NoteStorage::ReadTextFile(const std::wstring& path, std::string& text,
                                std::wstring& error) {
     std::ifstream file(fs::path(path), std::ios::binary);
     if (!file) {
-        error = L"无法读取文件：" + path;
+        error = i18n::Tr("note_storage.cannot_read_the_file") + path;
         return false;
     }
     text.assign((std::istreambuf_iterator<char>(file)),
@@ -640,13 +644,13 @@ bool NoteStorage::WriteBytes(const std::wstring& path, const std::string& bytes,
                              std::wstring& error) {
     std::ofstream file(fs::path(path), std::ios::binary | std::ios::trunc);
     if (!file) {
-        error = L"无法写入文件：" + path;
+        error = i18n::Tr("note_storage.cannot_write_the_file") + path;
         return false;
     }
     file.write(bytes.data(), (std::streamsize)bytes.size());
     file.flush();
     if (!file.good()) {
-        error = L"写入文件失败：" + path;
+        error = i18n::Tr("note_storage.failed_to_write_the_file") + path;
         return false;
     }
     return true;
@@ -663,14 +667,16 @@ bool NoteStorage::ReplaceFileAtomic(const std::wstring& source,
 #ifdef _WIN32
     if (!MoveFileExW(source.c_str(), target.c_str(),
                      MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
-        error = L"替换文件失败：" + target;
+        error = i18n::Tr("note_storage.failed_to_replace_the_file") +
+                target;
         return false;
     }
 #else
     std::error_code ec;
     fs::rename(fs::path(source), fs::path(target), ec);
     if (ec) {
-        error = L"替换文件失败：" + target;
+        error = i18n::Tr("note_storage.failed_to_replace_the_file") +
+                target;
         return false;
     }
 #endif

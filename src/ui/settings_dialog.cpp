@@ -2,13 +2,16 @@
 
 #include "core/text.h"
 #include "ui/app_font.h"
+#include "ui/dialogs.h"
 #include "ui/git_config.h"
 #include "ui/icon_button.h"
 #include "ui/icon_library.h"
 #include "ui/theme.h"
 #include "ui/ui_ids.h"
+#include "ui/ui_text.h"
 
 #include <wx/accel.h>
+#include <wx/choice.h>
 #include <wx/dirdlg.h>
 #include <wx/filedlg.h>
 #include <wx/filename.h>
@@ -151,7 +154,7 @@ void HotkeyCtrl::SetRawHotkey(const wxString& raw) {
 
 void HotkeyCtrl::UpdateDisplay() {
     if (raw_.empty()) {
-        ChangeValue(L"未设置");
+        ChangeValue(UiText("settings.not_set"));
         return;
     }
     wxAcceleratorEntry entry;
@@ -209,11 +212,13 @@ SettingsDialog::SettingsDialog(wxWindow* parent, const wxString& dataDir,
                                const wxString& showMainHotkey,
                                const wxString& newNoteHotkey,
                                const GitSyncConfig& gitConfig,
+                               i18n::Language language,
                                std::function<bool()> hasOpenNotes)
-    : wxDialog(parent, wxID_ANY, L"设置", wxDefaultPosition, wxDefaultSize,
-               wxDEFAULT_DIALOG_STYLE),
+    : wxDialog(parent, wxID_ANY, UiText("main.settings"), wxDefaultPosition,
+               wxDefaultSize, wxDEFAULT_DIALOG_STYLE),
       hasOpenNotes_(std::move(hasOpenNotes)),
-      dataDir_(dataDir) {
+      dataDir_(dataDir),
+      languageSetting_(language) {
     SetBackgroundColour(Theme::Background());
 
     auto* root = new wxBoxSizer(wxVERTICAL);
@@ -233,18 +238,41 @@ SettingsDialog::SettingsDialog(wxWindow* parent, const wxString& dataDir,
     auto addHint = [&](const wxString& text) {
         auto* hint = new wxStaticText(scroller_, wxID_ANY, text);
         hint->SetForegroundColour(Theme::TextMuted());
+        // 英文提示通常比中文长，固定换行宽度避免超出窗口。
+        hint->Wrap(FromDIP(520));
         content->Add(hint, 0, wxLEFT | wxRIGHT | wxTOP, FromDIP(20));
     };
 
-    addHeading(L"数据存储");
+    addHeading(UiText("settings.language_2"));
+    addHint(UiText("settings.changing_the_language_takes_effect_after_restart"));
 
-    addHint(L"便签保存在下面的目录；点击右侧文件夹图标更改，修改后下次启动仍然生效。\n"
-            L"路径较长时可悬停查看完整内容。");
+    auto* languageRow = new wxBoxSizer(wxHORIZONTAL);
+    auto* languageLabel = new wxStaticText(scroller_, wxID_ANY,
+                                           UiText("settings.language"));
+    languageLabel->SetForegroundColour(Theme::TextSubtle());
+    languageLabel->SetMinSize(FromDIP(wxSize(180, -1)));
+    languageRow->Add(languageLabel, 0, wxALIGN_CENTER_VERTICAL);
+
+    languageChoice_ = new wxChoice(scroller_, wxID_ANY);
+    languageChoice_->Append(UiText("settings.system_default"));
+    languageChoice_->Append(UiText("settings.chinese"));
+    languageChoice_->Append(L"English");
+    languageChoice_->SetSelection(language == i18n::Language::Chinese
+                                      ? 1
+                                      : (language == i18n::Language::English ? 2 : 0));
+    languageRow->Add(languageChoice_, 0, wxALIGN_CENTER_VERTICAL | wxLEFT,
+                     FromDIP(12));
+    content->Add(languageRow, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, FromDIP(20));
+
+    addHeading(UiText("settings.data_storage"));
+
+    addHint(UiText("settings.notes_are_stored_in_the_folder_below_click_the_f"));
 
     auto* dataRow = new wxBoxSizer(wxHORIZONTAL);
-    auto* dataLabel = new wxStaticText(scroller_, wxID_ANY, L"数据目录");
+    auto* dataLabel = new wxStaticText(scroller_, wxID_ANY,
+                                       UiText("settings.data_folder"));
     dataLabel->SetForegroundColour(Theme::TextSubtle());
-    dataLabel->SetMinSize(FromDIP(wxSize(160, -1)));
+    dataLabel->SetMinSize(FromDIP(wxSize(180, -1)));
     dataRow->Add(dataLabel, 0, wxALIGN_CENTER_VERTICAL);
 
     dataDirField_ = new wxTextCtrl(scroller_, wxID_ANY, dataDir, wxDefaultPosition,
@@ -253,19 +281,16 @@ SettingsDialog::SettingsDialog(wxWindow* parent, const wxString& dataDir,
     dataRow->Add(dataDirField_, 1, wxALIGN_CENTER_VERTICAL | wxLEFT, FromDIP(12));
 
     auto* browse = new IconButton(scroller_, kBrowseDataDirId, AppIcon::Folder,
-                                  L"选择数据目录", IconButton::Kind::Normal,
+                                  UiText("settings.choose_data_folder"),
+                                  IconButton::Kind::Normal,
                                   FromDIP(wxSize(34, 30)), 14);
     browse->SetEventTarget(this);
     dataRow->Add(browse, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, FromDIP(8));
     content->Add(dataRow, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, FromDIP(20));
 
-    addHeading(L"Git 同步");
+    addHeading(UiText("settings.git_sync"));
 
-    addHint(L"data 目录整体作为一个 Git 项目：所有分组、便签和其他文件"
-            L"都会一起同步。\n"
-            L"推送：提交本地改动后强制推送，远程以本地为准；\n"
-            L"拉取：先自动备份本地数据，再用远程内容强制覆盖本地。\n"
-            L"不做冲突合并。同步前请关闭所有便签窗口。");
+    addHint(UiText("settings.the_entire_data_folder_is_a_single_git_repositor"));
 
     auto addTextField = [&](const wxString& label, wxTextCtrl*& field,
                             const wxString& value, long style,
@@ -273,7 +298,7 @@ SettingsDialog::SettingsDialog(wxWindow* parent, const wxString& dataDir,
         auto* row = new wxBoxSizer(wxHORIZONTAL);
         auto* labelText = new wxStaticText(scroller_, wxID_ANY, label);
         labelText->SetForegroundColour(Theme::TextSubtle());
-        labelText->SetMinSize(FromDIP(wxSize(160, -1)));
+        labelText->SetMinSize(FromDIP(wxSize(180, -1)));
         row->Add(labelText, 0, wxALIGN_CENTER_VERTICAL);
 
         field = new wxTextCtrl(scroller_, wxID_ANY, value, wxDefaultPosition,
@@ -283,19 +308,23 @@ SettingsDialog::SettingsDialog(wxWindow* parent, const wxString& dataDir,
         content->Add(row, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, FromDIP(20));
     };
 
-    addTextField(L"仓库地址", gitUrl_, FromW(gitConfig.remoteUrl), 0,
+    addTextField(UiText("settings.repository_url"), gitUrl_,
+                 FromW(gitConfig.remoteUrl), 0,
                  L"https://github.com/user/notes.git");
 
     auto* exeRow = new wxBoxSizer(wxHORIZONTAL);
-    auto* exeLabel = new wxStaticText(scroller_, wxID_ANY, L"Git 程序");
+    auto* exeLabel = new wxStaticText(scroller_, wxID_ANY,
+                                      UiText("settings.git_executable"));
     exeLabel->SetForegroundColour(Theme::TextSubtle());
-    exeLabel->SetMinSize(FromDIP(wxSize(160, -1)));
+    exeLabel->SetMinSize(FromDIP(wxSize(180, -1)));
     exeRow->Add(exeLabel, 0, wxALIGN_CENTER_VERTICAL);
 
     gitExeField_ = new wxTextCtrl(scroller_, wxID_ANY, FromW(gitConfig.gitExe),
                                   wxDefaultPosition, wxDefaultSize, wxTE_CENTRE);
-    gitExeField_->SetHint(L"留空自动检测，例如 D:\\Git\\bin\\git.exe");
-    gitExeField_->SetToolTip(L"可填写本地 git.exe 的完整路径；留空则自动从 PATH 查找。");
+    gitExeField_->SetHint(
+        UiText("settings.leave_empty_to_auto_detect_e_g_d_git_bin_git_exe"));
+    gitExeField_->SetToolTip(
+        UiText("settings.full_path_to_a_local_git_exe_leave_empty_to_sear"));
     gitExeField_->Bind(wxEVT_KILL_FOCUS, [this](wxFocusEvent& event) {
         UpdateGitStatus();
         event.Skip();
@@ -303,7 +332,8 @@ SettingsDialog::SettingsDialog(wxWindow* parent, const wxString& dataDir,
     exeRow->Add(gitExeField_, 1, wxALIGN_CENTER_VERTICAL | wxLEFT, FromDIP(12));
 
     auto* browseGit = new IconButton(scroller_, kBrowseGitId, AppIcon::Folder,
-                                     L"选择 git.exe", IconButton::Kind::Normal,
+                                     UiText("settings.choose_git_exe"),
+                                     IconButton::Kind::Normal,
                                      FromDIP(wxSize(34, 30)), 14);
     browseGit->SetEventTarget(this);
     exeRow->Add(browseGit, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, FromDIP(8));
@@ -314,29 +344,33 @@ SettingsDialog::SettingsDialog(wxWindow* parent, const wxString& dataDir,
     content->Add(gitStatus_, 0, wxLEFT | wxRIGHT | wxTOP, FromDIP(20));
     UpdateGitStatus();
 
-    addTextField(L"用户名", gitUsername_, FromW(gitConfig.username), 0,
-                 L"公开仓库可留空");
-    addTextField(L"密码 / 令牌", gitToken_, FromW(gitConfig.token), wxTE_PASSWORD,
-                 L"访问令牌，加密保存在本机");
-    addTextField(L"分支", gitBranch_,
+    addTextField(UiText("settings.username"), gitUsername_,
+                 FromW(gitConfig.username), 0,
+                 UiText("settings.optional_for_public_repositories"));
+    addTextField(UiText("settings.password_token"), gitToken_,
+                 FromW(gitConfig.token), wxTE_PASSWORD,
+                 UiText("settings.access_token_encrypted_and_stored_on_this_comput"));
+    addTextField(UiText("settings.branch"), gitBranch_,
                  FromW(gitConfig.branch.empty() ? std::wstring(L"main")
                                                 : gitConfig.branch),
                  0, L"main");
 
     auto* syncRow = new wxBoxSizer(wxHORIZONTAL);
-    auto* syncLabel = new wxStaticText(scroller_, wxID_ANY, L"立即同步");
+    auto* syncLabel = new wxStaticText(scroller_, wxID_ANY,
+                                       UiText("settings.sync_now"));
     syncLabel->SetForegroundColour(Theme::TextSubtle());
-    syncLabel->SetMinSize(FromDIP(wxSize(160, -1)));
+    syncLabel->SetMinSize(FromDIP(wxSize(180, -1)));
     syncRow->Add(syncLabel, 0, wxALIGN_CENTER_VERTICAL);
 
     auto* push = new IconButton(
         scroller_, kGitPushId, AppIcon::CloudUpload,
-        L"推送到远程：提交本地改动并强制推送，本地覆盖远程", IconButton::Kind::Normal,
-        FromDIP(wxSize(34, 30)), 15);
+        UiText("settings.push_commit_local_changes_and_force_push_local_r"),
+        IconButton::Kind::Normal, FromDIP(wxSize(34, 30)), 15);
     push->SetEventTarget(this);
     syncRow->Add(push, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, FromDIP(12));
 
-    auto* pushText = new wxStaticText(scroller_, wxID_ANY, L"推送到远程");
+    auto* pushText = new wxStaticText(scroller_, wxID_ANY,
+                                      UiText("settings.push"));
     pushText->SetForegroundColour(Theme::Text());
     pushText->SetCursor(wxCursor(wxCURSOR_HAND));
     pushText->Bind(wxEVT_LEFT_UP, [this](wxMouseEvent&) {
@@ -350,12 +384,13 @@ SettingsDialog::SettingsDialog(wxWindow* parent, const wxString& dataDir,
 
     auto* pull = new IconButton(
         scroller_, kGitPullId, AppIcon::CloudDownload,
-        L"从远程拉取：先用远程内容覆盖本地，拉取前自动备份", IconButton::Kind::Normal,
-        FromDIP(wxSize(34, 30)), 15);
+        UiText("settings.pull_overwrite_local_content_with_the_remote_sta"),
+        IconButton::Kind::Normal, FromDIP(wxSize(34, 30)), 15);
     pull->SetEventTarget(this);
     syncRow->Add(pull, 0, wxALIGN_CENTER_VERTICAL);
 
-    auto* pullText = new wxStaticText(scroller_, wxID_ANY, L"从远程拉取");
+    auto* pullText = new wxStaticText(scroller_, wxID_ANY,
+                                      UiText("settings.pull"));
     pullText->SetForegroundColour(Theme::Text());
     pullText->SetCursor(wxCursor(wxCURSOR_HAND));
     pullText->Bind(wxEVT_LEFT_UP, [this](wxMouseEvent&) {
@@ -366,18 +401,16 @@ SettingsDialog::SettingsDialog(wxWindow* parent, const wxString& dataDir,
     syncRow->Add(pullText, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, FromDIP(6));
     content->Add(syncRow, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, FromDIP(20));
 
-    addHeading(L"快捷键设置");
+    addHeading(UiText("settings.keyboard_shortcuts"));
 
-    addHint(L"点击输入框后按下组合键；\n"
-            L"支持 Ctrl / Alt / Shift 的任意组合 + 字母、数字或 F1–F12；\n"
-            L"F1–F12 也可以单独使用。留空表示不启用，程序隐藏到托盘时仍然有效。");
+    addHint(UiText("settings.click_a_field_and_press_a_key_combination_ctrl_a"));
 
     auto addHotkeyRow = [&](const wxString& label, HotkeyCtrl*& field,
                             const wxString& value) {
         auto* row = new wxBoxSizer(wxHORIZONTAL);
         auto* labelText = new wxStaticText(scroller_, wxID_ANY, label);
         labelText->SetForegroundColour(Theme::TextSubtle());
-        labelText->SetMinSize(FromDIP(wxSize(160, -1)));
+        labelText->SetMinSize(FromDIP(wxSize(180, -1)));
         row->Add(labelText, 0, wxALIGN_CENTER_VERTICAL);
 
         field = new HotkeyCtrl(scroller_);
@@ -387,11 +420,13 @@ SettingsDialog::SettingsDialog(wxWindow* parent, const wxString& dataDir,
         content->Add(row, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, FromDIP(20));
     };
 
-    addHotkeyRow(L"显示主窗口", showMain_, showMainHotkey);
-    addHotkeyRow(L"新建便签", newNote_, newNoteHotkey);
+    addHotkeyRow(UiText("main.show_main_window"), showMain_,
+                 showMainHotkey);
+    addHotkeyRow(UiText("main.new_note"), newNote_, newNoteHotkey);
 
     error_ = new wxStaticText(scroller_, wxID_ANY, wxEmptyString);
     error_->SetForegroundColour(Theme::Danger());
+    error_->Wrap(FromDIP(520));
     error_->Hide();
     content->Add(error_, 0, wxLEFT | wxRIGHT | wxTOP, FromDIP(20));
 
@@ -401,8 +436,10 @@ SettingsDialog::SettingsDialog(wxWindow* parent, const wxString& dataDir,
 
     auto* buttons = new wxBoxSizer(wxHORIZONTAL);
     buttons->AddStretchSpacer(1);
-    auto* cancel = new IconButton(this, wxID_CANCEL, AppIcon::Close, L"取消");
-    auto* save = new IconButton(this, wxID_OK, AppIcon::Check, L"保存",
+    auto* cancel = new IconButton(this, wxID_CANCEL, AppIcon::Close,
+                                  UiText("dialogs.cancel"));
+    auto* save = new IconButton(this, wxID_OK, AppIcon::Check,
+                                UiText("settings.save"),
                                 IconButton::Kind::Accent);
     buttons->Add(cancel, 0, wxRIGHT, FromDIP(6));
     buttons->Add(save, 0);
@@ -411,11 +448,11 @@ SettingsDialog::SettingsDialog(wxWindow* parent, const wxString& dataDir,
     SetSizer(root);
 
     const wxRect work = wxGetClientDisplayRect();
-    const int width = std::min(FromDIP(600), work.width - FromDIP(32));
-    const int height = std::min(FromDIP(700), work.height - FromDIP(32));
-    SetSize(wxSize(std::max(width, FromDIP(460)),
-                   std::max(height, FromDIP(420))));
-    SetMinSize(wxSize(std::min(FromDIP(520), width), std::min(FromDIP(520), height)));
+    const int width = std::min(FromDIP(640), work.width - FromDIP(32));
+    const int height = std::min(FromDIP(720), work.height - FromDIP(32));
+    SetSize(wxSize(std::max(width, FromDIP(520)),
+                   std::max(height, FromDIP(460))));
+    SetMinSize(wxSize(std::min(FromDIP(560), width), std::min(FromDIP(520), height)));
     CentreOnParent();
 
     Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { OnBrowseDataDirectory(); },
@@ -446,7 +483,8 @@ wxString SettingsDialog::DataDirectory() const {
 }
 
 void SettingsDialog::OnBrowseDataDirectory() {
-    wxDirDialog dialog(this, L"选择便签数据目录", DataDirectory(), wxDD_DEFAULT_STYLE);
+    wxDirDialog dialog(this, UiText("settings.choose_note_data_folder"),
+                       DataDirectory(), wxDD_DEFAULT_STYLE);
     if (dialog.ShowModal() == wxID_OK && dataDirField_) {
         dataDirField_->ChangeValue(dialog.GetPath());
         dataDirField_->SetToolTip(dialog.GetPath());
@@ -465,9 +503,9 @@ void SettingsDialog::OnCharHook(wxKeyEvent& event) {
 void SettingsDialog::OnBrowseGit() {
     wxString current = gitExeField_ ? gitExeField_->GetValue() : wxString();
     wxFileName currentFile(current);
-    wxFileDialog dialog(this, L"选择 git.exe", currentFile.GetPath(),
-                        currentFile.GetFullName(),
-                        L"git.exe|git.exe|可执行文件 (*.exe)|*.exe|所有文件 (*.*)|*.*",
+    wxFileDialog dialog(this, UiText("settings.choose_git_exe"),
+                        currentFile.GetPath(), currentFile.GetFullName(),
+                        UiText("settings.git_exe_git_exe_executable_files_exe_exe_all_fil"),
                         wxFD_OPEN | wxFD_FILE_MUST_EXIST);
     if (dialog.ShowModal() == wxID_OK && gitExeField_) {
         gitExeField_->ChangeValue(dialog.GetPath());
@@ -491,15 +529,18 @@ void SettingsDialog::UpdateGitStatus() {
 
     if (gitExe.empty()) {
         gitStatus_->SetForegroundColour(Theme::Danger());
-        gitStatus_->SetLabel(configured.empty()
-                                 ? wxString(L"未检测到 Git，请安装 Git for Windows 或填写 git.exe 路径。")
-                                 : wxString(L"Git 程序不存在：") + configured);
+        gitStatus_->SetLabel(
+            configured.empty()
+                ? UiText("settings.git_was_not_detected_install_git_for_windows_or")
+                : UiText("settings.git_executable_not_found") +
+                      configured);
         gitStatus_->SetToolTip(wxString());
     } else {
         gitStatus_->SetForegroundColour(Theme::TextFaint());
-        gitStatus_->SetLabel(L"Git：" + FromW(gitExe));
+        gitStatus_->SetLabel(UiText("settings.git") + FromW(gitExe));
         gitStatus_->SetToolTip(FromW(gitExe));
     }
+    gitStatus_->Wrap(FromDIP(520));
     Layout();
     scroller_->Layout();
     scroller_->FitInside();
@@ -511,6 +552,18 @@ wxString SettingsDialog::ShowMainHotkey() const {
 
 wxString SettingsDialog::NewNoteHotkey() const {
     return newNote_ ? newNote_->RawHotkey() : wxString();
+}
+
+i18n::Language SettingsDialog::Language() const {
+    if (!languageChoice_) return languageSetting_;
+    switch (languageChoice_->GetSelection()) {
+        case 1:
+            return i18n::Language::Chinese;
+        case 2:
+            return i18n::Language::English;
+        default:
+            return i18n::Language::Auto;
+    }
 }
 
 GitSyncConfig SettingsDialog::CurrentGitConfig() const {
@@ -538,17 +591,18 @@ bool SettingsDialog::ValidateGitConfig(const GitSyncConfig& config) {
     if (config.remoteUrl.empty()) return true;
 
     if (config.branch.empty()) {
-        ShowError(L"Git 分支不能为空。");
+        ShowError(UiText("settings.the_git_branch_cannot_be_empty"));
         return false;
     }
     if (!config.token.empty() && config.username.empty()) {
-        ShowError(L"使用密码或访问令牌时，必须填写用户名。");
+        ShowError(UiText("git_sync.a_username_is_required_when_using_a_password_or"));
         return false;
     }
     if (!config.gitExe.empty()) {
         std::error_code ec;
         if (!fs::is_regular_file(fs::path(config.gitExe), ec)) {
-            ShowError(wxString(L"填写的 Git 程序不存在：\n") + FromW(config.gitExe));
+            ShowError(UiText("settings.the_specified_git_executable_does_not_exist") +
+                      FromW(config.gitExe));
             return false;
         }
     }
@@ -557,6 +611,7 @@ bool SettingsDialog::ValidateGitConfig(const GitSyncConfig& config) {
 
 void SettingsDialog::ShowError(const wxString& text) {
     error_->SetLabel(text);
+    error_->Wrap(FromDIP(520));
     error_->Show();
     Layout();
     scroller_->Layout();
@@ -566,7 +621,7 @@ void SettingsDialog::ShowError(const wxString& text) {
 
 void SettingsDialog::OnSave(wxCommandEvent&) {
     if (DataDirectory().empty()) {
-        ShowError(L"数据目录不能为空。");
+        ShowError(UiText("main.the_data_folder_cannot_be_empty"));
         return;
     }
 
@@ -577,7 +632,7 @@ void SettingsDialog::OnSave(wxCommandEvent&) {
     const wxString values[] = {showMain, newNote};
     for (const wxString& value : values) {
         if (!ParseHotkey(value, spec)) {
-            ShowError(L"快捷键格式无效，请重新录入。");
+            ShowError(UiText("settings.invalid_shortcut_format_please_enter_it_again"));
             return;
         }
     }
@@ -586,7 +641,7 @@ void SettingsDialog::OnSave(wxCommandEvent&) {
         return !a.empty() && a.IsSameAs(b, false);
     };
     if (same(showMain, newNote)) {
-        ShowError(L"不同操作不能使用相同的快捷键。");
+        ShowError(UiText("main.different_actions_cannot_use_the_same_shortcut"));
         return;
     }
 
@@ -606,13 +661,13 @@ void SettingsDialog::RunSync(bool push) {
     if (error_) error_->Hide();
     const wxString requestedDataDir = DataDirectory();
     if (!requestedDataDir.IsSameAs(dataDir_, false)) {
-        ShowError(L"数据目录已修改，请先保存设置，再执行 Git 同步。");
+        ShowError(UiText("settings.the_data_folder_has_changed_save_the_settings_be"));
         return;
     }
 
     const GitSyncConfig config = CurrentGitConfig();
     if (config.remoteUrl.empty()) {
-        ShowError(L"请先填写 Git 仓库地址。");
+        ShowError(UiText("git_sync.enter_the_git_repository_url_first"));
         return;
     }
     if (!ValidateGitConfig(config)) return;
@@ -620,34 +675,37 @@ void SettingsDialog::RunSync(bool push) {
     const std::wstring gitExe =
         config.gitExe.empty() ? FindGitExecutable() : config.gitExe;
     if (gitExe.empty()) {
-        ShowError(L"未检测到 Git，请填写 git.exe 的实际路径。");
+        ShowError(UiText("settings.git_was_not_detected_enter_the_actual_path_to_gi"));
         return;
     }
 
     const bool hasNotes = hasOpenNotes_ && hasOpenNotes_();
     if (!push && hasNotes) {
-        ShowError(L"请先关闭所有便签窗口，再执行“从远程拉取”。");
+        ShowError(UiText("settings.close_all_note_windows_before_pulling_from_the_r"));
         return;
     }
 
     if (push) {
         if (hasNotes) {
-            const int answer = wxMessageBox(
-                L"有打开的便签窗口，未保存的修改不会包含在推送内容中。\n\n是否继续？",
-                L"Git 同步", wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION, this);
+            const int answer = dialogs::Message(
+                this,
+                UiText("settings.some_note_windows_are_open_unsaved_changes_will"),
+                UiText("settings.git_sync"),
+                wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION);
             if (answer != wxYES) return;
         }
-        const int answer = wxMessageBox(
-            L"推送会提交本地改动并强制推送到远程仓库。\n"
-            L"如果远程和本地不一致，以本地为准，远程内容会被覆盖。\n\n是否继续？",
-            L"推送到远程", wxYES_NO | wxNO_DEFAULT | wxICON_WARNING, this);
+        const int answer = dialogs::Message(
+            this,
+            UiText("settings.push_will_commit_local_changes_and_force_push_th"),
+            UiText("settings.push"),
+            wxYES_NO | wxNO_DEFAULT | wxICON_WARNING);
         if (answer != wxYES) return;
     } else {
-        const int answer = wxMessageBox(
-            L"拉取会用远程仓库内容强制覆盖本地便签。\n"
-            L"如果本地和远程不一致，以远程为准；覆盖前会自动备份本地数据。\n\n"
-            L"是否继续？",
-            L"从远程拉取", wxYES_NO | wxNO_DEFAULT | wxICON_WARNING, this);
+        const int answer = dialogs::Message(
+            this,
+            UiText("settings.pull_will_overwrite_local_notes_with_the_remote"),
+            UiText("settings.pull"),
+            wxYES_NO | wxNO_DEFAULT | wxICON_WARNING);
         if (answer != wxYES) return;
     }
 
@@ -657,9 +715,10 @@ void SettingsDialog::RunSync(bool push) {
         return;
     }
 
-    wxProgressDialog progress(push ? L"推送到远程" : L"从远程拉取",
-                              L"正在准备...", 100, this,
-                              wxPD_APP_MODAL | wxPD_AUTO_HIDE);
+    wxProgressDialog progress(
+        push ? UiText("settings.push") : UiText("settings.pull"),
+        UiText("settings.preparing"), 100, this,
+        wxPD_APP_MODAL | wxPD_AUTO_HIDE);
     std::atomic<bool> done{false};
     std::mutex statusMutex;
     std::wstring status;
@@ -675,10 +734,10 @@ void SettingsDialog::RunSync(bool push) {
             result = push ? sync.Push(update) : sync.Pull(update);
         } catch (const std::exception&) {
             result.ok = false;
-            result.message = L"Git 同步过程中发生异常。";
+            result.message = i18n::Tr("settings.an_error_occurred_during_git_sync");
         } catch (...) {
             result.ok = false;
-            result.message = L"Git 同步过程中发生未知异常。";
+            result.message = i18n::Tr("settings.an_unknown_error_occurred_during_git_sync");
         }
         done.store(true);
     });
@@ -703,8 +762,10 @@ void SettingsDialog::RunSync(bool push) {
     if (!result.ok) {
         wxString message = FromW(result.message);
         if (!result.details.empty()) message += L"\n\n" + FromW(result.details);
-        wxMessageBox(message, L"Git 同步失败", wxOK | wxICON_ERROR, this);
-        ShowError(L"Git 同步失败，请检查仓库地址、Git 路径、账号和网络。");
+        dialogs::Message(this, message,
+                         UiText("settings.git_sync_failed"),
+                         wxOK | wxICON_ERROR);
+        ShowError(UiText("settings.git_sync_failed_check_the_repository_url_git_pat"));
         return;
     }
 
@@ -714,8 +775,12 @@ void SettingsDialog::RunSync(bool push) {
     wxString message = FromW(result.message);
     if (!result.details.empty()) message += L"\n\n" + FromW(result.details);
     if (!result.backupPath.empty()) {
-        message += L"\n\n本地备份：\n" + FromW(result.backupPath);
+        message += UiText("settings.local_backup") +
+                   FromW(result.backupPath);
     }
-    if (!push) message += L"\n\n关闭设置后便签列表会自动刷新。";
-    wxMessageBox(message, L"Git 同步", wxOK | wxICON_INFORMATION, this);
+    if (!push) {
+        message += UiText("settings.the_note_list_will_refresh_after_closing_setting");
+    }
+    dialogs::Message(this, message, UiText("settings.git_sync"),
+                     wxOK | wxICON_INFORMATION);
 }

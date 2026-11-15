@@ -4,8 +4,10 @@
 #include "resource.h"
 #include "single_instance.h"
 #include "ui/app_font.h"
+#include "ui/dialogs.h"
 #include "ui/git_config.h"
 #include "ui/icon_button.h"
+#include "ui/language_config.h"
 #include "ui/name_dialog.h"
 #include "ui/note_tree_ctrl.h"
 #include "ui/note_window.h"
@@ -13,6 +15,7 @@
 #include "ui/settings_dialog.h"
 #include "ui/theme.h"
 #include "ui/ui_ids.h"
+#include "ui/ui_text.h"
 #include "ui/window_effects.h"
 
 #include <wx/config.h>
@@ -145,9 +148,9 @@ public:
 
     wxMenu* CreatePopupMenu() override {
         auto* menu = new wxMenu;
-        menu->Append(ID_TRAY_OPEN, L"打开 PenDown");
+        menu->Append(ID_TRAY_OPEN, UiText("main.open_pendown"));
         menu->AppendSeparator();
-        menu->Append(ID_TRAY_EXIT, L"关闭");
+        menu->Append(ID_TRAY_EXIT, UiText("main.exit"));
         return menu;
     }
 
@@ -261,15 +264,18 @@ void MainFrame::BuildUi() {
     bar->AddSpacer(titleLeftPadding);
 
     const wxSize buttonSize = FromDIP(wxSize(26, 22));
-    addGroupButton_ = new IconButton(titleBar, ID_NOTE_ADD_GROUP, AppIcon::FolderPlus,
-                                     L"新建分组 (Ctrl+Shift+N)：选中分组时在其下新增子分组",
-                                     IconButton::Kind::Normal, buttonSize, 12);
-    addNoteButton_ = new IconButton(titleBar, ID_NOTE_ADD, AppIcon::NotePlus,
-                                    L"新建便签 (Ctrl+N)：未选分组时创建在根目录",
-                                    IconButton::Kind::Normal, buttonSize, 12);
-    deleteButton_ = new IconButton(titleBar, ID_NOTE_DELETE, AppIcon::Trash,
-                                   L"删除选中的分组或便签 (Del)", IconButton::Kind::Danger,
-                                   buttonSize, 12);
+    addGroupButton_ = new IconButton(
+        titleBar, ID_NOTE_ADD_GROUP, AppIcon::FolderPlus,
+        UiText("main.new_group_ctrl_shift_n_adds_a_subgroup_under_the"),
+        IconButton::Kind::Normal, buttonSize, 12);
+    addNoteButton_ = new IconButton(
+        titleBar, ID_NOTE_ADD, AppIcon::NotePlus,
+        UiText("main.new_note_ctrl_n_created_at_the_root_when_no_grou"),
+        IconButton::Kind::Normal, buttonSize, 12);
+    deleteButton_ = new IconButton(
+        titleBar, ID_NOTE_DELETE, AppIcon::Trash,
+        UiText("main.delete_the_selected_group_or_note_del"),
+        IconButton::Kind::Danger, buttonSize, 12);
     addGroupButton_->SetEventTarget(this);
     addNoteButton_->SetEventTarget(this);
     deleteButton_->SetEventTarget(this);
@@ -278,17 +284,20 @@ void MainFrame::BuildUi() {
     bar->Add(deleteButton_, 0);
     bar->AddStretchSpacer(1);
 
-    auto* settings = new IconButton(titleBar, ID_SETTINGS, AppIcon::Settings, L"设置",
+    auto* settings = new IconButton(titleBar, ID_SETTINGS, AppIcon::Settings,
+                                    UiText("main.settings"),
                                     IconButton::Kind::Normal, buttonSize, 12);
     settings->SetEventTarget(this);
     bar->Add(settings, 0);
 
     auto* minimize = new IconButton(titleBar, ID_WINDOW_MINIMIZE, AppIcon::Minimize,
-                                    L"最小化", IconButton::Kind::Normal, buttonSize, 12);
+                                    UiText("main.minimize"),
+                                    IconButton::Kind::Normal, buttonSize, 12);
     auto* maximize = new IconButton(titleBar, ID_WINDOW_MAXIMIZE, AppIcon::Maximize,
-                                    L"最大化 / 还原", IconButton::Kind::Normal, buttonSize,
-                                    12);
-    auto* close = new IconButton(titleBar, ID_WINDOW_CLOSE, AppIcon::Close, L"关闭",
+                                    UiText("main.maximize_restore"),
+                                    IconButton::Kind::Normal, buttonSize, 12);
+    auto* close = new IconButton(titleBar, ID_WINDOW_CLOSE, AppIcon::Close,
+                                 UiText("find.close"),
                                  IconButton::Kind::Danger, buttonSize, 12);
     minimize->SetEventTarget(this);
     maximize->SetEventTarget(this);
@@ -319,7 +328,9 @@ void MainFrame::BuildUi() {
     root->AddSpacer(FromDIP(4));
     root->Add(treeHost, 1, wxEXPAND);
 
-    bottomStatus_ = new wxStaticText(content, wxID_ANY, wxEmptyString);
+    bottomStatus_ = new wxStaticText(content, wxID_ANY, wxEmptyString,
+                                     wxDefaultPosition, wxDefaultSize,
+                                     wxST_ELLIPSIZE_END);
     bottomStatus_->SetForegroundColour(Theme::TextFaint());
     bottomStatus_->SetFont(AppFont::Make(std::max(8, AppFont::BasePointSize() - 2)));
 
@@ -576,10 +587,13 @@ void MainFrame::UnregisterHotkeys() {
 bool MainFrame::ApplyHotkeys(const wxString& showMain, const wxString& newNote) {
     HotkeySpec specs[2];
     const wxString values[2] = {showMain, newNote};
-    const wxString labels[2] = {L"显示主窗口", L"新建便签"};
+    const wxString labels[2] = {UiText("main.show_main_window"),
+                                UiText("main.new_note")};
     for (int i = 0; i < 2; ++i) {
         if (!ParseHotkey(values[i], specs[i])) {
-            wxMessageBox(L"快捷键格式无效，请重新设置。", L"设置", wxOK | wxICON_WARNING, this);
+            dialogs::Message(
+                this, UiText("main.invalid_shortcut_format_please_set_it_again"),
+                UiText("main.settings"), wxOK | wxICON_WARNING);
             return false;
         }
     }
@@ -589,7 +603,10 @@ bool MainFrame::ApplyHotkeys(const wxString& showMain, const wxString& newNote) 
                a.shift == b.shift && a.virtualKey == b.virtualKey;
     };
     if (duplicate(specs[0], specs[1])) {
-        wxMessageBox(L"不同操作不能使用相同的快捷键。", L"设置", wxOK | wxICON_WARNING, this);
+        dialogs::Message(
+            this,
+            UiText("main.different_actions_cannot_use_the_same_shortcut"),
+            UiText("main.settings"), wxOK | wxICON_WARNING);
         return false;
     }
 
@@ -607,9 +624,11 @@ bool MainFrame::ApplyHotkeys(const wxString& showMain, const wxString& newNote) 
         if (!::RegisterHotKey(hwnd, ids[i], modifiers | MOD_NOREPEAT, specs[i].virtualKey)) {
             UnregisterHotkeys();
             RegisterHotkeys();
-            wxMessageBox(wxString(L"快捷键「") + labels[i] +
-                             L"」已被其他程序占用，请换一个。",
-                         L"设置", wxOK | wxICON_WARNING, this);
+            dialogs::Message(
+                this,
+                wxString(UiText("main.the_shortcut")) + labels[i] +
+                    UiText("main.is_already_used_by_another_program_choose_anothe"),
+                UiText("main.settings"), wxOK | wxICON_WARNING);
             return false;
         }
     }
@@ -630,9 +649,11 @@ void MainFrame::OpenSettings() {
     wxString showMain = hotkeyShowMain_;
     wxString newNote = hotkeyNewNote_;
     GitSyncConfig gitConfig = LoadGitSyncConfig();
+    i18n::Language languageSetting = LoadLanguageSetting();
+    bool languageChanged = false;
     for (;;) {
         SettingsDialog dialog(
-            this, dataDir, showMain, newNote, gitConfig,
+            this, dataDir, showMain, newNote, gitConfig, languageSetting,
             [this]() { return !noteWindows_.empty(); });
         const int result = dialog.ShowModal();
         const bool pulled = dialog.DidPull();
@@ -654,9 +675,31 @@ void MainFrame::OpenSettings() {
         gitConfig = dialog.GitConfig();
         wxString gitError;
         if (!SaveGitSyncConfig(gitConfig, gitError)) {
-            wxMessageBox(gitError, L"Git 配置", wxOK | wxICON_WARNING, this);
+            dialogs::Message(this, gitError, UiText("main.git_settings"),
+                             wxOK | wxICON_WARNING);
         }
-        if (ApplyHotkeys(showMain, newNote)) return;
+        if (!ApplyHotkeys(showMain, newNote)) continue;
+
+        const i18n::Language requestedLanguage = dialog.Language();
+        if (requestedLanguage != languageSetting) {
+            if (!SaveLanguageSetting(requestedLanguage)) {
+                dialogs::Message(
+                    this,
+                    UiText("main.failed_to_save_the_language_setting"),
+                    UiText("main.settings"), wxOK | wxICON_WARNING);
+            } else {
+                languageSetting = requestedLanguage;
+                languageChanged = true;
+            }
+        }
+        break;
+    }
+
+    if (languageChanged) {
+        dialogs::Message(
+            this,
+            UiText("main.language_changed_restart_pendown_to_apply_it"),
+            UiText("main.settings"), wxOK | wxICON_INFORMATION);
     }
 }
 
@@ -665,7 +708,9 @@ bool MainFrame::ChangeDataDirectory(const wxString& newDirValue) {
     wxString target = newDirValue;
     target.Trim(true).Trim(false);
     if (target.empty()) {
-        wxMessageBox(L"数据目录不能为空。", L"更改数据目录", wxOK | wxICON_WARNING, this);
+        dialogs::Message(
+            this, UiText("main.the_data_folder_cannot_be_empty"),
+            UiText("main.change_data_folder"), wxOK | wxICON_WARNING);
         return false;
     }
 
@@ -684,15 +729,20 @@ bool MainFrame::ChangeDataDirectory(const wxString& newDirValue) {
                (child[parent.size()] == L'\\' || child[parent.size()] == L'/');
     };
     if (isSameOrChild(targetLower, oldLower) || isSameOrChild(oldLower, targetLower)) {
-        wxMessageBox(L"新数据目录不能位于旧数据目录内部，反之亦然。", L"更改数据目录",
-                     wxOK | wxICON_WARNING, this);
+        dialogs::Message(
+            this,
+            UiText("main.the_new_data_folder_cannot_be_inside_the_old_one"),
+            UiText("main.change_data_folder"), wxOK | wxICON_WARNING);
         return false;
     }
 
     fs::create_directories(targetPath, ec);
     if (ec || !fs::is_directory(targetPath, ec)) {
-        wxMessageBox(wxString(L"无法创建数据目录：\n") + FromW(targetPath.wstring()),
-                     L"更改数据目录", wxOK | wxICON_ERROR, this);
+        dialogs::Message(
+            this,
+            wxString(UiText("main.cannot_create_the_data_folder")) +
+                FromW(targetPath.wstring()),
+            UiText("main.change_data_folder"), wxOK | wxICON_ERROR);
         return false;
     }
 
@@ -708,14 +758,18 @@ bool MainFrame::ChangeDataDirectory(const wxString& newDirValue) {
     const bool targetHasData = hasEntries(targetPath);
     bool copyExisting = false;
     if (targetHasData) {
-        int answer = wxMessageBox(
-            L"目标目录已有内容。\n\n切换后将直接使用该目录，不会自动合并或覆盖现有便签。\n\n是否继续？",
-            L"更改数据目录", wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION, this);
+        int answer = dialogs::Message(
+            this,
+            UiText("main.the_target_folder_already_contains_files_pendown"),
+            UiText("main.change_data_folder"),
+            wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION);
         if (answer != wxYES) return false;
     } else if (oldHasData) {
-        int answer = wxMessageBox(
-            L"是否把当前便签复制到新目录？\n\n选择“否”只切换目录，原便签会保留在原位置。",
-            L"更改数据目录", wxYES_NO | wxCANCEL | wxICON_QUESTION, this);
+        int answer = dialogs::Message(
+            this,
+            UiText("main.copy_the_current_notes_to_the_new_folder_choose"),
+            UiText("main.change_data_folder"),
+            wxYES_NO | wxCANCEL | wxICON_QUESTION);
         if (answer == wxCANCEL) return false;
         copyExisting = answer == wxYES;
     }
@@ -726,8 +780,10 @@ bool MainFrame::ChangeDataDirectory(const wxString& newDirValue) {
         if (window && !window->Close()) return false;
     }
     if (!noteWindows_.empty()) {
-        wxMessageBox(L"仍有便签窗口未关闭，数据目录未修改。", L"更改数据目录",
-                     wxOK | wxICON_WARNING, this);
+        dialogs::Message(
+            this,
+            UiText("main.some_note_windows_are_still_open_the_data_folder"),
+            UiText("main.change_data_folder"), wxOK | wxICON_WARNING);
         return false;
     }
 
@@ -739,14 +795,19 @@ bool MainFrame::ChangeDataDirectory(const wxString& newDirValue) {
                          fs::copy_options::recursive | fs::copy_options::overwrite_existing,
                          copyError);
                 if (copyError) {
-                    wxMessageBox(L"复制便签数据失败，旧数据未改动。", L"更改数据目录",
-                                 wxOK | wxICON_ERROR, this);
+                    dialogs::Message(
+                        this,
+                        UiText("main.failed_to_copy_note_data_the_original_data_was_n"),
+                        UiText("main.change_data_folder"),
+                        wxOK | wxICON_ERROR);
                     return false;
                 }
             }
         } catch (const std::exception&) {
-            wxMessageBox(L"复制便签数据失败，旧数据未改动。", L"更改数据目录",
-                         wxOK | wxICON_ERROR, this);
+            dialogs::Message(
+                this,
+                UiText("main.failed_to_copy_note_data_the_original_data_was_n"),
+                UiText("main.change_data_folder"), wxOK | wxICON_ERROR);
             return false;
         }
     }
@@ -754,8 +815,11 @@ bool MainFrame::ChangeDataDirectory(const wxString& newDirValue) {
     auto newStore = std::make_shared<NoteStore>();
     std::wstring error;
     if (!newStore->Open(targetPath.wstring(), error)) {
-        wxMessageBox(wxString(L"切换数据目录失败：\n") + FromW(error), L"更改数据目录",
-                     wxOK | wxICON_ERROR, this);
+        dialogs::Message(
+            this,
+            wxString(UiText("main.failed_to_switch_the_data_folder")) +
+                FromW(error),
+            UiText("main.change_data_folder"), wxOK | wxICON_ERROR);
         LoadData();
         RebuildTree();
         return false;
@@ -774,8 +838,10 @@ bool MainFrame::ChangeDataDirectory(const wxString& newDirValue) {
         config->Flush();
     }
     if (copyExisting) {
-        wxMessageBox(L"现有便签已复制到新目录，旧目录保留作为备份。", L"更改数据目录",
-                     wxOK | wxICON_INFORMATION, this);
+        dialogs::Message(
+            this,
+            UiText("main.the_notes_were_copied_to_the_new_folder_the_old"),
+            UiText("main.change_data_folder"), wxOK | wxICON_INFORMATION);
     }
     return true;
 }
@@ -824,8 +890,11 @@ void MainFrame::LoadData() {
 
     std::wstring error;
     if (!store_->ListTree(groups_, notes_, error)) {
-        wxMessageBox(wxString(L"读取便签目录失败：\n") + FromW(error), L"PenDown",
-                     wxOK | wxICON_ERROR, this);
+        dialogs::Message(
+            this,
+            wxString(UiText("main.failed_to_read_the_notes_folder")) +
+                FromW(error),
+            L"PenDown", wxOK | wxICON_ERROR);
     }
     RebuildIndexes();
 }
@@ -902,7 +971,7 @@ void MainFrame::RebuildTree() {
             noteItem.kind = NoteTreeCtrl::Kind::Note;
             noteItem.path = note.rel_path;
             noteItem.depth = 0;
-            noteItem.text = note.title;
+            noteItem.text = DisplayNoteTitle(note.title);
             items.push_back(std::move(noteItem));
         }
     }
@@ -915,7 +984,7 @@ void MainFrame::RebuildTree() {
         item.kind = NoteTreeCtrl::Kind::Group;
         item.path = group.rel_path;
         item.depth = depth;
-        item.text = group.name;
+        item.text = DisplayGroupName(group.name);
         item.expanded = IsGroupExpanded(group.rel_path);
         item.count = (int)noteCount(groupLower);
 
@@ -936,7 +1005,7 @@ void MainFrame::RebuildTree() {
                 noteItem.kind = NoteTreeCtrl::Kind::Note;
                 noteItem.path = note.rel_path;
                 noteItem.depth = depth + 1;
-                noteItem.text = note.title;
+                noteItem.text = DisplayNoteTitle(note.title);
                 items.push_back(std::move(noteItem));
             }
         }
@@ -982,8 +1051,11 @@ void MainFrame::RebuildTree() {
 
 void MainFrame::UpdateCounts() {
     if (!countLabel_) return;
-    const wxString text =
-        wxString::Format(L"%d 条 · %d 组", (int)notes_.size(), (int)groups_.size());
+    const std::wstring notes =
+        i18n::Plural("count.notes", (long)notes_.size());
+    const std::wstring groups =
+        i18n::Plural("count.groups", (long)groups_.size());
+    const wxString text = FromW(notes + L" · " + groups);
     if (countLabel_->GetLabel() == text) return;
     countLabel_->SetLabel(text);
     if (auto* footer = countLabel_->GetContainingSizer()) footer->Layout();
@@ -994,20 +1066,22 @@ void MainFrame::UpdateSelectionState() {
         if (item->kind == NoteTreeCtrl::Kind::Group) {
             selectedGroupPath_ = item->path;
             selectedNotePath_.clear();
-            SetBottomStatus(wxString(L"分组：") + FromW(GroupName(item->path)));
+            SetBottomStatus(UiText("main.group") +
+                            FromW(DisplayGroupName(GroupName(item->path))));
         } else {
             selectedGroupPath_.clear();
             selectedNotePath_ = item->path;
             if (const NoteFileEntry* note = FindNote(item->path)) {
-                SetBottomStatus(wxString(L"便签：") + FromW(note->title));
+                SetBottomStatus(UiText("main.note_2") +
+                                FromW(DisplayNoteTitle(note->title)));
             } else {
-                SetBottomStatus(L"便签");
+                SetBottomStatus(UiText("main.note"));
             }
         }
     } else {
         selectedGroupPath_.clear();
         selectedNotePath_.clear();
-        SetBottomStatus(L"未选分组：新便签将创建在根目录");
+        SetBottomStatus(UiText("main.no_group_notes_go_to_the_root"));
     }
 
     if (deleteButton_) {
@@ -1026,15 +1100,22 @@ void MainFrame::AddGroup() {
 }
 
 void MainFrame::AddGroupUnder(const std::wstring& parentPath) {
-    NameDialog dialog(this, parentPath.empty() ? L"新建分组" : L"新建子分组", L"分组名称");
+    NameDialog dialog(
+        this,
+        parentPath.empty() ? UiText("main.new_group")
+                           : UiText("main.new_subgroup"),
+        UiText("main.group_name"));
     if (dialog.ShowModal() != wxID_OK) return;
 
     std::wstring created;
     std::wstring error;
     if (!store_ ||
         !store_->CreateGroup(parentPath, ToW(dialog.GetValue()), created, error)) {
-        wxMessageBox(wxString(L"新建分组失败：\n") + FromW(error), L"PenDown",
-                     wxOK | wxICON_ERROR, this);
+        dialogs::Message(
+            this,
+            wxString(UiText("main.failed_to_create_the_group")) +
+                FromW(error),
+            L"PenDown", wxOK | wxICON_ERROR);
         return;
     }
 
@@ -1134,9 +1215,11 @@ void MainFrame::RenameGroup(const std::wstring& groupPath) {
         }
     }
     if (hasOpenWindow) {
-        int answer = wxMessageBox(
-            L"这个分组里有打开的便签。\n重命名前会先关闭这些窗口，是否继续？",
-            L"重命名分组", wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION, this);
+        int answer = dialogs::Message(
+            this,
+            UiText("main.this_group_has_open_notes_they_will_be_closed_be"),
+            UiText("main.rename_group"),
+            wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION);
         if (answer != wxYES) return;
         std::vector<NoteWindow*> windows = noteWindows_;
         for (NoteWindow* window : windows) {
@@ -1146,14 +1229,18 @@ void MainFrame::RenameGroup(const std::wstring& groupPath) {
         }
     }
 
-    NameDialog dialog(this, L"重命名分组", L"分组名称", FromW(oldName));
+    NameDialog dialog(this, UiText("main.rename_group"),
+                      UiText("main.group_name"), FromW(oldName));
     if (dialog.ShowModal() != wxID_OK) return;
 
     std::wstring renamed;
     std::wstring error;
     if (!store_ || !store_->RenameGroup(targetPath, ToW(dialog.GetValue()), renamed, error)) {
-        wxMessageBox(wxString(L"重命名分组失败：\n") + FromW(error), L"PenDown",
-                     wxOK | wxICON_ERROR, this);
+        dialogs::Message(
+            this,
+            wxString(UiText("main.failed_to_rename_the_group")) +
+                FromW(error),
+            L"PenDown", wxOK | wxICON_ERROR);
         return;
     }
 
@@ -1187,8 +1274,9 @@ void MainFrame::MoveToGroup(NoteTreeCtrl::Kind kind, const std::wstring& path) {
     if (!currentGroup.empty()) {
         // 不选上级：分组放到根；便签放到根目录。
         targets.push_back(std::wstring());
-        labels.Add(kind == NoteTreeCtrl::Kind::Group ? L"不选上级（根分组）"
-                                                     : L"不选分组（根目录）");
+        labels.Add(kind == NoteTreeCtrl::Kind::Group
+                       ? UiText("main.no_parent_root_group")
+                       : UiText("main.no_group_root_folder"));
     }
     for (const NoteGroupEntry& group : groups_) {
         if (kind == NoteTreeCtrl::Kind::Group) {
@@ -1199,15 +1287,19 @@ void MainFrame::MoveToGroup(NoteTreeCtrl::Kind kind, const std::wstring& path) {
         }
         targets.push_back(group.rel_path);
         std::wstring label(GroupDepth(group.rel_path) * 2, L' ');
-        label += group.name;
+        label += DisplayGroupName(group.name);
         labels.Add(FromW(label));
     }
     if (targets.empty()) {
-        wxMessageBox(L"没有可用的目标分组。", L"移动到分组", wxOK | wxICON_INFORMATION, this);
+        dialogs::Message(
+            this, UiText("main.no_target_groups_are_available"),
+            UiText("main.move_to_group_2"), wxOK | wxICON_INFORMATION);
         return;
     }
 
-    wxSingleChoiceDialog dialog(this, L"选择目标分组：", L"移动到分组", labels);
+    wxSingleChoiceDialog dialog(this, UiText("main.choose_a_target_group"),
+                               UiText("main.move_to_group_2"), labels);
+    dialogs::LocalizeStandardButtons(&dialog);
     if (dialog.ShowModal() != wxID_OK) return;
     const int selection = dialog.GetSelection();
     if (selection < 0 || selection >= (int)targets.size()) return;
@@ -1217,8 +1309,11 @@ void MainFrame::MoveToGroup(NoteTreeCtrl::Kind kind, const std::wstring& path) {
     std::wstring newRel;
     if (kind == NoteTreeCtrl::Kind::Group) {
         if (!store_->MoveGroup(path, target, newRel, error)) {
-            wxMessageBox(wxString(L"移动分组失败：\n") + FromW(error), L"PenDown",
-                         wxOK | wxICON_ERROR, this);
+            dialogs::Message(
+                this,
+                wxString(UiText("main.failed_to_move_the_group")) +
+                    FromW(error),
+                L"PenDown", wxOK | wxICON_ERROR);
             return;
         }
 
@@ -1251,8 +1346,11 @@ void MainFrame::MoveToGroup(NoteTreeCtrl::Kind kind, const std::wstring& path) {
         }
     } else {
         if (!store_->MoveNote(path, target, newRel, error)) {
-            wxMessageBox(wxString(L"移动便签失败：\n") + FromW(error), L"PenDown",
-                         wxOK | wxICON_ERROR, this);
+            dialogs::Message(
+                this,
+                wxString(UiText("main.failed_to_move_the_note")) +
+                    FromW(error),
+                L"PenDown", wxOK | wxICON_ERROR);
             return;
         }
         if (NoteWindow* window = FindNoteWindow(path)) {
@@ -1289,17 +1387,23 @@ void MainFrame::DeleteGroup(const std::wstring& groupPath) {
     const std::wstring targetPath = groupPath;
     std::set<std::wstring> subtree;
     CollectGroupTree(targetPath, subtree);
-    int answer = wxMessageBox(
-        wxString(L"删除分组「") + FromW(GroupName(targetPath)) +
-            L"」及其中所有子分组和便签？\n删除后会移到回收站，可在回收站中找回。",
-        L"删除分组", wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION, this);
+    int answer = dialogs::Message(
+        this,
+        wxString(UiText("main.delete_the_group")) +
+            FromW(DisplayGroupName(GroupName(targetPath))) +
+            UiText("main.and_all_its_subgroups_and_notes_they_will_be_mov"),
+        UiText("main.delete_group"),
+        wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION);
     if (answer != wxYES) return;
 
     CloseNoteWindowsInGroups(subtree);
     std::wstring error;
     if (!store_ || !store_->DeleteGroup(targetPath, error)) {
-        wxMessageBox(wxString(L"删除分组失败：\n") + FromW(error), L"PenDown",
-                     wxOK | wxICON_ERROR, this);
+        dialogs::Message(
+            this,
+            wxString(UiText("main.failed_to_delete_the_group")) +
+                FromW(error),
+            L"PenDown", wxOK | wxICON_ERROR);
         return;
     }
 
@@ -1322,9 +1426,13 @@ void MainFrame::DeleteNote(const std::wstring& notePath) {
     std::wstring title = note->title;
     std::wstring groupPath = note->group_path;
 
-    int answer = wxMessageBox(wxString(L"删除便签「") + FromW(title) +
-                                  L"」？\n删除后会移到回收站，可在回收站中找回。",
-                              L"删除便签", wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION, this);
+    int answer = dialogs::Message(
+        this,
+        wxString(UiText("main.delete_the_note")) +
+            FromW(DisplayNoteTitle(title)) +
+            UiText("main.it_will_be_moved_to_the_recycle_bin_and_can_be_r"),
+        UiText("main.delete_note"),
+        wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION);
     if (answer != wxYES) return;
 
     if (NoteWindow* window = FindNoteWindow(targetPath)) {
@@ -1335,8 +1443,11 @@ void MainFrame::DeleteNote(const std::wstring& notePath) {
 
     std::wstring error;
     if (!store_ || !store_->DeleteNote(targetPath, error)) {
-        wxMessageBox(wxString(L"删除便签失败：\n") + FromW(error), L"PenDown",
-                     wxOK | wxICON_ERROR, this);
+        dialogs::Message(
+            this,
+            wxString(UiText("main.failed_to_delete_the_note")) +
+                FromW(error),
+            L"PenDown", wxOK | wxICON_ERROR);
         return;
     }
 
@@ -1359,20 +1470,22 @@ void MainFrame::OnTreeContext(bool hasItem, NoteTreeCtrl::Kind kind,
                               const std::wstring& path, const wxPoint& screen) {
     wxMenu menu;
     if (!hasItem) {
-        menu.Append(ID_CTX_NEW_GROUP, L"新建分组");
-        menu.Append(ID_CTX_NEW_ROOT_NOTE, L"新建便签（根目录）");
+        menu.Append(ID_CTX_NEW_GROUP, UiText("main.new_group"));
+        menu.Append(ID_CTX_NEW_ROOT_NOTE,
+                    UiText("main.new_note_root"));
     } else if (kind == NoteTreeCtrl::Kind::Group) {
-        menu.Append(ID_CTX_NEW_SUBGROUP, L"新建子分组");
-        menu.Append(ID_CTX_NEW_NOTE, L"在此分组新建便签");
+        menu.Append(ID_CTX_NEW_SUBGROUP, UiText("main.new_subgroup"));
+        menu.Append(ID_CTX_NEW_NOTE,
+                    UiText("main.new_note_in_this_group"));
         menu.AppendSeparator();
-        menu.Append(ID_CTX_RENAME, L"重命名分组");
-        menu.Append(ID_CTX_MOVE, L"移动到分组...");
-        menu.Append(ID_CTX_DELETE, L"删除分组");
+        menu.Append(ID_CTX_RENAME, UiText("main.rename_group"));
+        menu.Append(ID_CTX_MOVE, UiText("main.move_to_group"));
+        menu.Append(ID_CTX_DELETE, UiText("main.delete_group"));
     } else {
-        menu.Append(ID_CTX_OPEN, L"打开便签");
-        menu.Append(ID_CTX_MOVE, L"移动到分组...");
+        menu.Append(ID_CTX_OPEN, UiText("main.open_note"));
+        menu.Append(ID_CTX_MOVE, UiText("main.move_to_group"));
         menu.AppendSeparator();
-        menu.Append(ID_CTX_DELETE, L"删除便签");
+        menu.Append(ID_CTX_DELETE, UiText("main.delete_note"));
     }
 
     int command = GetPopupMenuSelectionFromUser(menu, tree_->ScreenToClient(screen));
@@ -1454,7 +1567,7 @@ void MainFrame::OnNoteSaved(const std::wstring& oldPath, const std::wstring& not
     entry.rel_path = notePath;
     entry.group_path = resolvedGroup;
     entry.title = fs::path(notePath).stem().wstring();
-    if (entry.title.empty()) entry.title = L"无标题便签";
+    if (entry.title.empty()) entry.title = kDefaultNoteTitle;
     notes_.insert(notes_.begin(), std::move(entry));
 
     indexesDirty_ = true;

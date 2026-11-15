@@ -3,6 +3,7 @@
 #include "ui/app_font.h"
 #include "ui/icon_button.h"
 #include "ui/theme.h"
+#include "ui/ui_text.h"
 
 #include <wx/sizer.h>
 #include <wx/stattext.h>
@@ -22,7 +23,7 @@ NameDialog::NameDialog(wxWindow* parent, const wxString& title, const wxString& 
 
     input_ = new wxTextCtrl(this, wxID_ANY, value, wxDefaultPosition, wxDefaultSize,
                             wxTE_PROCESS_ENTER | wxTE_CENTRE);
-    input_->SetHint(L"输入名称");
+    input_->SetHint(UiText("name.enter_a_name"));
     root->Add(input_, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, FromDIP(20));
 
     error_ = new wxStaticText(this, wxID_ANY, wxEmptyString);
@@ -32,15 +33,17 @@ NameDialog::NameDialog(wxWindow* parent, const wxString& title, const wxString& 
 
     auto* buttons = new wxBoxSizer(wxHORIZONTAL);
     buttons->AddStretchSpacer(1);
-    auto* cancel = new IconButton(this, wxID_CANCEL, AppIcon::Close, L"取消");
-    ok_ = new IconButton(this, wxID_OK, AppIcon::Check, L"确定", IconButton::Kind::Accent);
+    auto* cancel = new IconButton(this, wxID_CANCEL, AppIcon::Close,
+                                  UiText("dialogs.cancel"));
+    ok_ = new IconButton(this, wxID_OK, AppIcon::Check, UiText("dialogs.ok"),
+                         IconButton::Kind::Accent);
     buttons->Add(cancel, 0, wxRIGHT, FromDIP(6));
     buttons->Add(ok_, 0);
     root->Add(buttons, 0, wxEXPAND | wxALL, FromDIP(20));
 
     SetSizer(root);
-    SetSize(FromDIP(wxSize(420, 205)));
-    SetMinSize(FromDIP(wxSize(360, 190)));
+    SetSize(FromDIP(wxSize(460, 205)));
+    SetMinSize(FromDIP(wxSize(400, 190)));
     CentreOnParent();
 
     Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { Confirm(); }, wxID_OK);
@@ -72,7 +75,7 @@ void NameDialog::UpdateButtons() {
 
 void NameDialog::Confirm() {
     if (GetValue().empty()) {
-        error_->SetLabel(L"名称不能为空");
+        error_->SetLabel(UiText("name.the_name_cannot_be_empty"));
         error_->Show();
         Layout();
         input_->SetFocus();

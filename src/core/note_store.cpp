@@ -1,5 +1,6 @@
 #include "core/note_store.h"
 
+#include "core/i18n.h"
 #include "core/note_storage.h"
 
 #include <windows.h>
@@ -46,7 +47,7 @@ bool RenamePath(const fs::path& source, const fs::path& target, std::wstring& er
     if (!SamePath(source, target)) {
         fs::rename(source, target, ec);
         if (ec) {
-            error = L"重命名失败：" + target.wstring();
+            error = i18n::Tr("note_store.rename_failed") + target.wstring();
             return false;
         }
         return true;
@@ -57,14 +58,14 @@ bool RenamePath(const fs::path& source, const fs::path& target, std::wstring& er
                      std::to_wstring(GetTickCount64()));
     fs::rename(source, temp, ec);
     if (ec) {
-        error = L"重命名失败：" + source.wstring();
+        error = i18n::Tr("note_store.rename_failed") + source.wstring();
         return false;
     }
     fs::rename(temp, target, ec);
     if (ec) {
         std::error_code ignored;
         fs::rename(temp, source, ignored);
-        error = L"重命名失败：" + target.wstring();
+        error = i18n::Tr("note_store.rename_failed") + target.wstring();
         return false;
     }
     return true;
@@ -143,12 +144,12 @@ std::vector<fs::path> ExistingPaths(const std::vector<fs::path>& candidates) {
 bool IsRecycleBinAvailable(const fs::path& path, std::wstring& error) {
     const std::wstring root = path.root_path().wstring();
     if (root.empty()) {
-        error = L"无法确定删除位置所在的磁盘。";
+        error = i18n::Tr("note_store.cannot_determine_the_drive_for_the_deletion_targ");
         return false;
     }
     const UINT type = ::GetDriveTypeW(root.c_str());
     if (type == DRIVE_FIXED || type == DRIVE_REMOVABLE) return true;
-    error = L"当前位置不在本地磁盘上，回收站不可用；请在资源管理器中手动删除。";
+    error = i18n::Tr("note_store.the_location_is_not_on_a_local_drive_so_the_recy");
     return false;
 }
 
@@ -175,8 +176,10 @@ bool MoveToRecycleBin(const std::vector<fs::path>& paths, std::wstring& error) {
     const int result = ::SHFileOperationW(&operation);
     if (result == 0 && !operation.fAnyOperationsAborted) return true;
 
-    error = result == 0 ? L"删除操作已取消"
-                        : L"移入回收站失败（错误代码 " + std::to_wstring(result) + L"）";
+    error = result == 0
+                ? i18n::Tr("note_store.the_delete_operation_was_canceled")
+                : i18n::Tr("note_store.failed_to_move_to_the_recycle_bin_error_code") +
+                      std::to_wstring(result) + i18n::Tr("git_sync.text");
     return false;
 }
 #endif
@@ -187,13 +190,14 @@ bool NoteStore::Open(const std::wstring& dataDir, std::wstring& error) {
     std::error_code ec;
     fs::path requested(dataDir);
     if (requested.empty()) {
-        error = L"数据目录为空";
+        error = i18n::Tr("note_store.the_data_folder_is_empty");
         return false;
     }
 
     fs::create_directories(requested, ec);
     if (ec) {
-        error = L"无法创建数据目录：" + requested.wstring();
+        error = i18n::Tr("note_store.cannot_create_the_data_folder") +
+                requested.wstring();
         return false;
     }
 
@@ -217,7 +221,7 @@ bool NoteStore::ListTree(std::vector<NoteGroupEntry>& groups, std::vector<NoteFi
     groups.clear();
     notes.clear();
     if (dataDir_.empty()) {
-        error = L"便签数据目录未初始化";
+        error = i18n::Tr("note_store.the_note_data_folder_is_not_initialized");
         return false;
     }
 
@@ -233,7 +237,8 @@ bool NoteStore::ListTree(std::vector<NoteGroupEntry>& groups, std::vector<NoteFi
         fs::directory_iterator iterator(directory, fs::directory_options::skip_permission_denied,
                                         ec);
         if (ec) {
-            error = L"无法读取目录：" + directory.wstring();
+            error = i18n::Tr("git_sync.cannot_read_the_folder") +
+                    directory.wstring();
             return false;
         }
 
@@ -297,31 +302,32 @@ bool NoteStore::ListTree(std::vector<NoteGroupEntry>& groups, std::vector<NoteFi
 bool NoteStore::CreateGroup(const std::wstring& parentRel, const std::wstring& name,
                             std::wstring& createdRel, std::wstring& error) {
     if (!IsSafeRelative(parentRel)) {
-        error = L"分组路径无效";
+        error = i18n::Tr("note_store.invalid_group_path");
         return false;
     }
     std::wstring clean = SanitizeName(name);
     if (clean.empty()) {
-        error = L"分组名称不能为空";
+        error = i18n::Tr("note_store.the_group_name_cannot_be_empty");
         return false;
     }
 
     std::error_code ec;
     fs::path parent = parentRel.empty() ? fs::path(dataDir_) : fs::path(AbsolutePath(parentRel));
     if (!parentRel.empty() && !fs::is_directory(parent, ec)) {
-        error = L"上级分组不存在";
+        error = i18n::Tr("note_store.the_parent_group_does_not_exist");
         return false;
     }
     fs::create_directories(parent, ec);
     if (ec) {
-        error = L"无法创建上级分组目录";
+        error = i18n::Tr("note_store.cannot_create_the_parent_group_folder");
         return false;
     }
 
     std::wstring actual = UniqueName(parent, clean, L"");
     fs::path target = parent / actual;
     if (!fs::create_directory(target, ec) || ec) {
-        error = L"创建分组目录失败：" + target.wstring();
+        error = i18n::Tr("note_store.failed_to_create_the_group_folder") +
+                target.wstring();
         return false;
     }
     createdRel = JoinRelative(parentRel, actual);
@@ -331,25 +337,25 @@ bool NoteStore::CreateGroup(const std::wstring& parentRel, const std::wstring& n
 bool NoteStore::RenameGroup(const std::wstring& relPath, const std::wstring& newName,
                             std::wstring& newRel, std::wstring& error) {
     if (!IsSafeRelative(relPath) || relPath.empty()) {
-        error = L"分组路径无效";
+        error = i18n::Tr("note_store.invalid_group_path");
         return false;
     }
     std::wstring clean = SanitizeName(newName);
     if (clean.empty()) {
-        error = L"分组名称不能为空";
+        error = i18n::Tr("note_store.the_group_name_cannot_be_empty");
         return false;
     }
 
     fs::path current = fs::path(AbsolutePath(relPath));
     std::error_code ec;
     if (!fs::is_directory(current, ec)) {
-        error = L"分组不存在";
+        error = i18n::Tr("note_store.the_group_does_not_exist");
         return false;
     }
     fs::path parent = current.parent_path();
     fs::path target = parent / clean;
     if (!SamePath(current, target) && fs::exists(target)) {
-        error = L"同名分组已存在";
+        error = i18n::Tr("note_store.a_group_with_the_same_name_already_exists");
         return false;
     }
     if (!RenamePath(current, target, error)) return false;
@@ -362,14 +368,14 @@ bool NoteStore::RenameGroup(const std::wstring& relPath, const std::wstring& new
 bool NoteStore::MoveGroup(const std::wstring& relPath, const std::wstring& newParentRel,
                           std::wstring& newRel, std::wstring& error) {
     if (!IsSafeRelative(relPath) || relPath.empty() || !IsSafeRelative(newParentRel)) {
-        error = L"分组路径无效";
+        error = i18n::Tr("note_store.invalid_group_path");
         return false;
     }
 
     const std::wstring targetParentRel = newParentRel;
     const std::wstring currentParentRel = fs::path(relPath).parent_path().wstring();
     if (Lower(targetParentRel) == Lower(currentParentRel)) {
-        error = L"分组已经在该分组下";
+        error = i18n::Tr("note_store.the_group_is_already_in_that_group");
         return false;
     }
 
@@ -378,11 +384,11 @@ bool NoteStore::MoveGroup(const std::wstring& relPath, const std::wstring& newPa
     fs::path targetParent = targetParentRel.empty() ? fs::path(dataDir_)
                                                     : fs::path(AbsolutePath(targetParentRel));
     if (!fs::is_directory(source, ec)) {
-        error = L"分组不存在";
+        error = i18n::Tr("note_store.the_group_does_not_exist");
         return false;
     }
     if (!fs::is_directory(targetParent, ec)) {
-        error = L"目标分组不存在";
+        error = i18n::Tr("note_store.the_target_group_does_not_exist");
         return false;
     }
 
@@ -392,20 +398,21 @@ bool NoteStore::MoveGroup(const std::wstring& relPath, const std::wstring& newPa
         (parentPath.size() > sourcePath.size() &&
          parentPath.compare(0, sourcePath.size(), sourcePath) == 0 &&
          (parentPath[sourcePath.size()] == L'\\' || parentPath[sourcePath.size()] == L'/'))) {
-        error = L"不能把分组移动到自身或它的子分组下";
+        error = i18n::Tr("note_store.a_group_cannot_be_moved_into_itself_or_one_of_it");
         return false;
     }
 
     const std::wstring name = source.filename().wstring();
     fs::path target = targetParent / name;
     if (fs::exists(target, ec)) {
-        error = L"目标分组下已存在同名分组";
+        error = i18n::Tr("note_store.a_group_with_the_same_name_already_exists_in_the");
         return false;
     }
 
     fs::rename(source, target, ec);
     if (ec) {
-        error = L"移动分组失败：" + target.wstring();
+        error = i18n::Tr("note_store.failed_to_move_the_group") +
+                target.wstring();
         return false;
     }
     newRel = JoinRelative(targetParentRel, name);
@@ -415,7 +422,7 @@ bool NoteStore::MoveGroup(const std::wstring& relPath, const std::wstring& newPa
 bool NoteStore::DeleteGroup(const std::wstring& relPath, std::wstring& error,
                             NoteDeleteMode mode) {
     if (!IsSafeRelative(relPath) || relPath.empty()) {
-        error = L"分组路径无效";
+        error = i18n::Tr("note_store.invalid_group_path");
         return false;
     }
 
@@ -433,7 +440,8 @@ bool NoteStore::DeleteGroup(const std::wstring& relPath, std::wstring& error,
 
     fs::remove_all(target, ec);
     if (ec) {
-        error = L"删除分组目录失败：" + target.wstring();
+        error = i18n::Tr("note_store.failed_to_delete_the_group_folder") +
+                target.wstring();
         return false;
     }
     return true;
@@ -442,7 +450,7 @@ bool NoteStore::DeleteGroup(const std::wstring& relPath, std::wstring& error,
 bool NoteStore::ReadNote(const std::wstring& relPath, std::string& bytes,
                          std::wstring& error) const {
     if (!IsSafeRelative(relPath) || relPath.empty()) {
-        error = L"便签路径无效";
+        error = i18n::Tr("note_store.invalid_note_path");
         return false;
     }
     return NoteStorage::ReadTextFile(AbsolutePath(relPath), bytes, error);
@@ -452,11 +460,11 @@ bool NoteStore::LoadNoteDocument(const std::wstring& relPath, std::string& text,
                                  StyleModel& styles, std::wstring& warning,
                                  std::wstring& error) const {
     if (!IsSafeRelative(relPath) || relPath.empty()) {
-        error = L"便签路径无效";
+        error = i18n::Tr("note_store.invalid_note_path");
         return false;
     }
     if (!NoteStorage::Load(AbsolutePath(relPath), text, styles, warning)) {
-        error = L"读取便签失败：" + relPath;
+        error = i18n::Tr("note_store.failed_to_read_the_note") + relPath;
         return false;
     }
     return true;
@@ -474,7 +482,7 @@ bool NoteStore::SaveNote(const std::wstring& relPath, const std::wstring& groupR
                          const StyleModel& styles, std::wstring& savedRel,
                          std::wstring& error) {
     if (!IsSafeRelative(relPath) || !IsSafeRelative(groupRel)) {
-        error = L"便签路径无效";
+        error = i18n::Tr("note_store.invalid_note_path");
         return false;
     }
 
@@ -485,13 +493,14 @@ bool NoteStore::SaveNote(const std::wstring& relPath, const std::wstring& groupR
     if (!fs::is_directory(groupDir, ec)) {
         fs::create_directories(groupDir, ec);
         if (ec) {
-            error = L"分组目录不存在：" + groupPath;
+            error = i18n::Tr("note_store.the_group_folder_does_not_exist") +
+                    groupPath;
             return false;
         }
     }
 
-    std::wstring base = SanitizeName(title.empty() ? L"无标题便签" : title);
-    if (base.empty()) base = L"无标题便签";
+    std::wstring base = SanitizeName(title.empty() ? kDefaultNoteTitle : title);
+    if (base.empty()) base = kDefaultNoteTitle;
     const std::wstring extension = L".txt";
     const std::wstring lowerBase = Lower(base);
     if (lowerBase.size() > extension.size() &&
@@ -499,7 +508,7 @@ bool NoteStore::SaveNote(const std::wstring& relPath, const std::wstring& groupR
         base = base.substr(0, base.size() - extension.size());
     }
     base = Trim(base);
-    if (base.empty()) base = L"无标题便签";
+    if (base.empty()) base = kDefaultNoteTitle;
 
     fs::path current = relPath.empty() ? fs::path() : fs::path(AbsolutePath(relPath));
     bool currentExists = !current.empty() && fs::is_regular_file(current, ec);
@@ -541,7 +550,8 @@ bool NoteStore::SaveNote(const std::wstring& relPath, const std::wstring& groupR
         const std::wstring oldStyle = NoteStorage::StylePath(current.wstring());
         fs::remove(current, ec);
         if (ec) {
-            error = L"旧便签文件删除失败：" + current.wstring();
+            error = i18n::Tr("note_store.failed_to_delete_the_old_note_file") +
+                    current.wstring();
             return false;
         }
         fs::remove(fs::path(oldStyle), ec);
@@ -557,7 +567,7 @@ bool NoteStore::SaveNoteAutosave(const std::wstring& relPath,
                                  const StyleModel& styles,
                                  std::wstring& error) {
     if (!IsSafeRelative(relPath) || relPath.empty()) {
-        error = L"便签路径无效";
+        error = i18n::Tr("note_store.invalid_note_path");
         return false;
     }
     return NoteStorage::SaveAutosave(AbsolutePath(relPath), bytes, styles, error);
@@ -582,14 +592,14 @@ bool NoteStore::LoadNoteAutosave(const std::wstring& relPath, std::string& text,
 bool NoteStore::MoveNote(const std::wstring& relPath, const std::wstring& newGroupRel,
                          std::wstring& newRel, std::wstring& error) {
     if (!IsSafeRelative(relPath) || relPath.empty() || !IsSafeRelative(newGroupRel)) {
-        error = L"便签路径无效";
+        error = i18n::Tr("note_store.invalid_note_path");
         return false;
     }
 
     const std::wstring targetGroupRel = newGroupRel;
     const std::wstring currentGroupRel = fs::path(relPath).parent_path().wstring();
     if (Lower(targetGroupRel) == Lower(currentGroupRel)) {
-        error = L"便签已经在该分组下";
+        error = i18n::Tr("note_store.the_note_is_already_in_that_group");
         return false;
     }
 
@@ -598,24 +608,25 @@ bool NoteStore::MoveNote(const std::wstring& relPath, const std::wstring& newGro
     fs::path targetGroup = targetGroupRel.empty() ? fs::path(dataDir_)
                                                   : fs::path(AbsolutePath(targetGroupRel));
     if (!fs::is_regular_file(source, ec)) {
-        error = L"便签文件不存在";
+        error = i18n::Tr("note_store.the_note_file_does_not_exist");
         return false;
     }
     if (!fs::is_directory(targetGroup, ec)) {
-        error = L"目标分组不存在";
+        error = i18n::Tr("note_store.the_target_group_does_not_exist");
         return false;
     }
 
     const std::wstring name = source.filename().wstring();
     fs::path target = targetGroup / name;
     if (fs::exists(target, ec)) {
-        error = L"目标分组下已存在同名便签";
+        error = i18n::Tr("note_store.a_note_with_the_same_name_already_exists_in_the");
         return false;
     }
 
     fs::rename(source, target, ec);
     if (ec) {
-        error = L"移动便签失败：" + target.wstring();
+        error = i18n::Tr("note_store.failed_to_move_the_note") +
+                target.wstring();
         return false;
     }
 
@@ -627,7 +638,8 @@ bool NoteStore::MoveNote(const std::wstring& relPath, const std::wstring& newGro
             // 正文已经移动，尽量回滚，避免留下没有样式的半成品。
             std::error_code ignored;
             fs::rename(target, source, ignored);
-            error = L"移动样式文件失败：" + targetStyle.wstring();
+            error = i18n::Tr("note_store.failed_to_move_the_style_file") +
+                    targetStyle.wstring();
             return false;
         }
     }
@@ -639,7 +651,7 @@ bool NoteStore::MoveNote(const std::wstring& relPath, const std::wstring& newGro
 bool NoteStore::DeleteNote(const std::wstring& relPath, std::wstring& error,
                            NoteDeleteMode mode) {
     if (!IsSafeRelative(relPath) || relPath.empty()) {
-        error = L"便签路径无效";
+        error = i18n::Tr("note_store.invalid_note_path");
         return false;
     }
 
@@ -673,7 +685,8 @@ bool NoteStore::DeleteNote(const std::wstring& relPath, std::wstring& error,
         std::error_code removeError;
         fs::remove(file, removeError);
         if (removeError && ok) {
-            error = L"删除文件失败：" + file.wstring();
+            error = i18n::Tr("note_store.failed_to_delete_the_file") +
+                    file.wstring();
             ok = false;
         }
     }
@@ -697,7 +710,7 @@ std::wstring NoteStore::DeriveTitle(const std::wstring& text) {
         if (newline == std::wstring::npos) break;
         start = newline + 1;
     }
-    return L"无标题便签";
+    return kDefaultNoteTitle;
 }
 
 std::wstring NoteStore::SanitizeName(const std::wstring& name) {
@@ -717,7 +730,7 @@ std::wstring NoteStore::SanitizeName(const std::wstring& name) {
     }
     if (out.size() > 60) out.resize(60);
     while (!out.empty() && (iswspace(out.back()) || out.back() == L'.')) out.pop_back();
-    if (out.empty()) return L"未命名";
+    if (out.empty()) return kDefaultGroupName;
     if (IsReservedFileName(out)) out += L"_";
     return out;
 }

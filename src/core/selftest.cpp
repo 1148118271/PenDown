@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 
+#include "core/i18n.h"
 #include "core/note_store.h"
 #include "core/note_storage.h"
 #include "core/style_model.h"
@@ -369,7 +370,18 @@ bool RunSelfTest(const std::wstring& reportPath) {
         check(store.DeleteNote(rootNote, error, NoteDeleteMode::Permanent),
               L"delete root note");
         check(store.ListTree(groups, notes, error) && groups.empty() && notes.empty(),
-              L"tree after delete");    }
+              L"tree after delete");
+    }
+
+    const i18n::Language previousLanguage = i18n::Current();
+    i18n::SetLanguage(i18n::Language::English);
+    check(i18n::Tr("selftest.hello") == L"Hello", L"i18n english");
+    check(i18n::Plural("count.notes", 1) == L"1 note", L"i18n singular");
+    check(i18n::Plural("count.notes", 2) == L"2 notes", L"i18n plural");
+    i18n::SetLanguage(i18n::Language::Chinese);
+    check(i18n::Tr("selftest.hello") == L"你好", L"i18n chinese");
+    check(i18n::Plural("count.notes", 2) == L"2 条", L"i18n chinese plural");
+    i18n::SetLanguage(previousLanguage);
 
     fs::remove_all(tempRoot, ec);
 

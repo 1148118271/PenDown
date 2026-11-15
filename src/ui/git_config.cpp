@@ -1,5 +1,6 @@
 #include "ui/git_config.h"
 
+#include "core/i18n.h"
 #include "core/text.h"
 
 #include <wx/base64.h>
@@ -89,7 +90,7 @@ GitSyncConfig LoadGitSyncConfig() {
 bool SaveGitSyncConfig(const GitSyncConfig& config, wxString& error) {
     wxConfigBase* store = wxConfigBase::Get();
     if (!store) {
-        error = L"无法访问程序配置。";
+        error = i18n::Tr("git_config.cannot_access_the_application_configuration");
         return false;
     }
 
@@ -98,7 +99,7 @@ bool SaveGitSyncConfig(const GitSyncConfig& config, wxString& error) {
     if (!token.empty()) {
         storedToken = ProtectToken(token);
         if (storedToken.empty()) {
-            error = L"无法加密访问令牌，配置未保存。";
+            error = i18n::Tr("git_config.failed_to_encrypt_the_access_token_the_configura");
             return false;
         }
     }
@@ -110,7 +111,7 @@ bool SaveGitSyncConfig(const GitSyncConfig& config, wxString& error) {
                  config.branch.empty() ? wxString(L"main") : FromW(config.branch));
     store->Write("/Git/Exe", FromW(config.gitExe));
     if (!store->Flush()) {
-        error = L"保存 Git 配置失败。";
+        error = i18n::Tr("git_config.failed_to_save_the_git_configuration");
         return false;
     }
     return true;

@@ -4,12 +4,14 @@
 #include "resource.h"
 #include "ui/app_font.h"
 #include "ui/color_popup.h"
+#include "ui/dialogs.h"
 #include "ui/find_replace_dialog.h"
 #include "ui/icon_button.h"
 #include "ui/note_editor.h"
 #include "ui/style_popup.h"
 #include "ui/theme.h"
 #include "ui/ui_ids.h"
+#include "ui/ui_text.h"
 #include "ui/window_effects.h"
 
 #include <wx/datetime.h>
@@ -183,29 +185,31 @@ void NoteWindow::BuildUi() {
 
     const wxSize buttonSize = FromDIP(wxSize(26, 22));
 
-    colorButton_ = new IconButton(titleBar, ID_NOTE_COLOR, AppIcon::Palette,
-                                  L"文字颜色 / 背景色", IconButton::Kind::Normal,
-                                  buttonSize, 12);
+    colorButton_ = new IconButton(
+        titleBar, ID_NOTE_COLOR, AppIcon::Palette,
+        UiText("note.text_color_background_color"),
+        IconButton::Kind::Normal, buttonSize, 12);
     colorButton_->SetEventTarget(this);
     bar->Add(colorButton_, 0, wxRIGHT, FromDIP(1));
 
-    styleButton_ = new IconButton(titleBar, ID_NOTE_STYLES, AppIcon::Styles,
-                                  L"样式库：字体、字号、加粗、斜体等",
-                                  IconButton::Kind::Normal, buttonSize, 12);
+    styleButton_ = new IconButton(
+        titleBar, ID_NOTE_STYLES, AppIcon::Styles,
+        UiText("note.style_library_font_size_bold_italic_and_more"),
+        IconButton::Kind::Normal, buttonSize, 12);
     styleButton_->SetEventTarget(this);
     bar->Add(styleButton_, 0);
 
     // 清除样式和格式刷是高频的一次性动作，放到标题栏比藏在样式库里更顺手。
     clearFormatButton_ = new IconButton(
         titleBar, ID_NOTE_CLEAR_FORMAT, AppIcon::Eraser,
-        L"清除样式：恢复默认字体、字号、颜色和链接",
+        UiText("note.clear_formatting_restore_default_font_size_color"),
         IconButton::Kind::Normal, buttonSize, 12);
     clearFormatButton_->SetEventTarget(this);
     bar->Add(clearFormatButton_, 0, wxLEFT, FromDIP(1));
 
     formatPainterButton_ = new IconButton(
         titleBar, ID_NOTE_FORMAT_PAINTER, AppIcon::FormatPainter,
-        L"格式刷：先复制当前格式，再选中目标文字",
+        UiText("note.format_painter_copy_the_current_format_then_sele"),
         IconButton::Kind::Normal, buttonSize, 12);
     formatPainterButton_->SetEventTarget(this);
     bar->Add(formatPainterButton_, 0, wxLEFT, FromDIP(1));
@@ -214,24 +218,25 @@ void NoteWindow::BuildUi() {
 
     // 保存和删除都是整篇便签级别的操作，与窗口按钮一起放在右侧。
     auto* save = new IconButton(titleBar, ID_NOTE_SAVE, AppIcon::Save,
-                                L"保存便签 (Ctrl+S)", IconButton::Kind::Accent,
-                                buttonSize, 12);
+                                UiText("note.save_note_ctrl_s"),
+                                IconButton::Kind::Accent, buttonSize, 12);
     save->SetEventTarget(this);
     bar->Add(save, 0, wxRIGHT, FromDIP(1));
 
     auto* remove = new IconButton(titleBar, ID_NOTE_DELETE, AppIcon::Trash,
-                                  L"删除便签", IconButton::Kind::Danger, buttonSize,
-                                  12);
+                                  UiText("main.delete_note"),
+                                  IconButton::Kind::Danger, buttonSize, 12);
     remove->SetEventTarget(this);
     bar->Add(remove, 0);
 
     auto* minimize = new IconButton(titleBar, ID_WINDOW_MINIMIZE, AppIcon::Minimize,
-                                    L"最小化", IconButton::Kind::Normal, buttonSize,
-                                    12);
+                                    UiText("main.minimize"),
+                                    IconButton::Kind::Normal, buttonSize, 12);
     auto* maximize = new IconButton(titleBar, ID_WINDOW_MAXIMIZE, AppIcon::Maximize,
-                                    L"最大化 / 还原", IconButton::Kind::Normal,
-                                    buttonSize, 12);
-    auto* close = new IconButton(titleBar, ID_WINDOW_CLOSE, AppIcon::Close, L"关闭",
+                                    UiText("main.maximize_restore"),
+                                    IconButton::Kind::Normal, buttonSize, 12);
+    auto* close = new IconButton(titleBar, ID_WINDOW_CLOSE, AppIcon::Close,
+                                 UiText("find.close"),
                                  IconButton::Kind::Danger, buttonSize, 12);
     minimize->SetEventTarget(this);
     maximize->SetEventTarget(this);
@@ -266,7 +271,9 @@ void NoteWindow::BuildUi() {
     editorHost->SetSizer(editorSizer);
     root->Add(editorHost, 1, wxEXPAND | wxTOP, FromDIP(4));
 
-    status_ = new wxStaticText(content, wxID_ANY, wxEmptyString);
+    status_ = new wxStaticText(content, wxID_ANY, wxEmptyString,
+                               wxDefaultPosition, wxDefaultSize,
+                               wxST_ELLIPSIZE_END);
     status_->SetForegroundColour(Theme::TextFaint());
     status_->SetFont(AppFont::Make(std::max(8, AppFont::BasePointSize() - 2)));
     // 和主窗口底部状态栏使用同一套间距。
@@ -334,7 +341,7 @@ void NoteWindow::BindEvents() {
         UpdateStatus();
     });
     editor_->SetPainterAppliedHandler([this] {
-        ShowHint(L"格式刷：已应用格式");
+        ShowHint(UiText("note.format_painter_formatting_applied"));
         UpdateStatus();
         UpdateFormatPainterState();
     });
@@ -362,8 +369,11 @@ void NoteWindow::LoadNote() {
         std::wstring error;
         if (!store_->LoadNoteDocument(notePath_, text, styles, warning, error)) {
             loadFailed_ = true;
-            wxMessageBox(wxString(L"读取便签失败：\n") + FromW(error), L"PenDown",
-                         wxOK | wxICON_ERROR, this);
+            dialogs::Message(
+                this,
+                wxString(UiText("note.failed_to_read_the_note")) +
+                    FromW(error),
+                L"PenDown", wxOK | wxICON_ERROR);
         }
     }
 
@@ -379,14 +389,15 @@ void NoteWindow::LoadNote() {
     UpdateFrameTitle();
 
     if (!warning.empty()) {
-        wxMessageBox(warning, L"PenDown", wxOK | wxICON_WARNING, this);
+        dialogs::Message(this, warning, L"PenDown", wxOK | wxICON_WARNING);
     }
 
     if (!notePath_.empty() && store_ && store_->HasNoteAutosave(notePath_) &&
         !loadFailed_) {
-        const int answer = wxMessageBox(
-            L"发现上次退出前自动保存的内容，是否恢复？", L"PenDown",
-            wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION, this);
+        const int answer = dialogs::Message(
+            this,
+            UiText("note.an_autosaved_version_from_the_last_session_was_f"),
+            L"PenDown", wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION);
         if (answer == wxYES) {
             std::string autosaveText;
             StyleModel autosaveStyles = editor_->Styles();
@@ -410,9 +421,10 @@ void NoteWindow::LoadNote() {
 bool NoteWindow::SaveNote() {
     if (!store_ || !editor_) return false;
     if (loadFailed_) {
-        wxMessageBox(L"便签读取失败，为避免覆盖原文件，本次不会保存。\n"
-                     L"请先备份原文件后再处理。",
-                     L"PenDown", wxOK | wxICON_ERROR, this);
+        dialogs::Message(
+            this,
+            UiText("note.the_note_could_not_be_read_to_avoid_overwriting"),
+            L"PenDown", wxOK | wxICON_ERROR);
         return false;
     }
 
@@ -424,8 +436,11 @@ bool NoteWindow::SaveNote() {
     std::wstring error;
     if (!store_->SaveNote(notePath_, groupPath_, text, title, editor_->Styles(),
                           savedPath, error)) {
-        wxMessageBox(wxString(L"保存便签失败：\n") + FromW(error), L"PenDown",
-                     wxOK | wxICON_ERROR, this);
+        dialogs::Message(
+            this,
+            wxString(UiText("note.failed_to_save_the_note")) +
+                FromW(error),
+            L"PenDown", wxOK | wxICON_ERROR);
         return false;
     }
 
@@ -450,7 +465,8 @@ void NoteWindow::SaveAutosave() {
     const std::string text = editor_->GetTextUtf8();
     std::wstring error;
     if (store_->SaveNoteAutosave(notePath_, text, editor_->Styles(), error)) {
-        autosaveLabel_ = wxDateTime::Now().Format(L"自动保存 %H:%M");
+        autosaveLabel_ = UiText("note.autosaved") +
+                         wxDateTime::Now().FormatTime();
         UpdateStatus();
     }
     autosaving_ = false;
@@ -470,10 +486,11 @@ void NoteWindow::ScheduleAutosave() {
 
 void NoteWindow::DeleteNote() {
     if (notePath_.empty()) {
-        const int answer = wxMessageBox(L"当前便签还没有保存，关闭后内容不会保留。是否继续？",
-                                        L"删除便签",
-                                        wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION,
-                                        this);
+        const int answer = dialogs::Message(
+            this,
+            UiText("note.this_note_has_not_been_saved_yet_its_content_wil"),
+            UiText("main.delete_note"),
+            wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION);
         if (answer != wxYES) return;
         dirty_ = false;
         editor_->MarkSaved();
@@ -482,17 +499,22 @@ void NoteWindow::DeleteNote() {
         return;
     }
 
-    wxString title = FromW(title_.empty() ? L"无标题便签" : title_);
-    const int answer = wxMessageBox(wxString(L"删除便签「") + title +
-                                        L"」？\n删除后会移到回收站，可在回收站中找回。",
-                                    L"删除便签",
-                                    wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION, this);
+    wxString title = FromW(DisplayNoteTitle(title_));
+    const int answer = dialogs::Message(
+        this,
+        wxString(UiText("main.delete_the_note")) + title +
+            UiText("main.it_will_be_moved_to_the_recycle_bin_and_can_be_r"),
+        UiText("main.delete_note"),
+        wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION);
     if (answer != wxYES) return;
 
     std::wstring error;
     if (store_ && !store_->DeleteNote(notePath_, error)) {
-        wxMessageBox(wxString(L"删除便签失败：\n") + FromW(error), L"PenDown",
-                     wxOK | wxICON_ERROR, this);
+        dialogs::Message(
+            this,
+            wxString(UiText("main.failed_to_delete_the_note")) +
+                FromW(error),
+            L"PenDown", wxOK | wxICON_ERROR);
         return;
     }
     if (store_) store_->RemoveNoteAutosave(notePath_);
@@ -627,7 +649,7 @@ void NoteWindow::ApplyStyle(FormatCommand command) {
 void NoteWindow::ClearFormatting() {
     if (!editor_) return;
     editor_->ApplyCommand(FormatCommand::ClearFormatting);
-    ShowHint(L"已清除样式");
+    ShowHint(UiText("note.formatting_cleared"));
     UpdateStatus();
     UpdateFormatPainterState();
     editor_->FocusEditor();
@@ -639,14 +661,14 @@ void NoteWindow::ToggleFormatPainter() {
     if (editor_->FormatPainterArmed()) {
         // 已经复制格式时再点一次就是取消，避免误把格式刷到整行。
         editor_->CancelFormatPainter();
-        ShowHint(L"格式刷：已取消");
+        ShowHint(UiText("note.format_painter_canceled"));
     } else {
         const NoteEditor::FormatPainterResult result =
             editor_->ApplyFormatPainter();
         if (result == NoteEditor::FormatPainterResult::Copied) {
-            ShowHint(L"格式刷：已复制格式，选择目标文字后松开鼠标即可应用");
+            ShowHint(UiText("note.format_painter_format_copied_select_the_target_t"));
         } else if (result == NoteEditor::FormatPainterResult::Applied) {
-            ShowHint(L"格式刷：已应用格式");
+            ShowHint(UiText("note.format_painter_formatting_applied"));
         }
     }
     UpdateStatus();
@@ -686,12 +708,14 @@ void NoteWindow::UpdateFormatPainterState() {
 void NoteWindow::UpdateStatus() {
     if (!status_ || !editor_) return;
     statusTimer_.Stop();
-    wxString text = L"文本";
+    wxString text = UiText("note.text");
     if (notePath_.empty() && !dirty_) {
-        text += L" · 新建";
+        text += UiText("note.new");
     } else {
-        text += dirty_ ? L" · 未保存" : L" · 已保存";
-        text += wxString::Format(L" · %ld 字", editor_->CharCount());
+        text += dirty_ ? UiText("note.unsaved")
+                       : UiText("note.saved");
+        text += L" · " +
+                FromW(i18n::Plural("count.characters", editor_->CharCount()));
     }
     if (!autosaveLabel_.empty()) text += L" · " + autosaveLabel_;
     if (!hintText_.empty()) text += L" · " + hintText_;
@@ -700,13 +724,13 @@ void NoteWindow::UpdateStatus() {
 
 void NoteWindow::UpdateFrameTitle() {
     if (!editor_) return;
-    wxString display = FromW(title_.empty() ? L"无标题便签" : title_);
-    if (notePath_.empty()) display = L"新建便签";
+    wxString display = FromW(DisplayNoteTitle(title_));
+    if (notePath_.empty()) display = UiText("main.new_note");
     if (GetTitle() != display) SetTitle(display);
 }
 
 std::wstring NoteWindow::DeriveTitle() const {
-    if (!editor_) return L"无标题便签";
+    if (!editor_) return kDefaultNoteTitle;
     return TitleFromUtf8(editor_->GetTextUtf8());
 }
 
@@ -719,8 +743,10 @@ void NoteWindow::MarkDirty() {
 
 void NoteWindow::OnClose(wxCloseEvent& event) {
     if (dirty_ || (editor_ && editor_->IsDirty())) {
-        const int answer = wxMessageBox(L"当前文件未保存，是否保存后关闭？", L"PenDown",
-                                        wxYES_NO | wxCANCEL | wxICON_QUESTION, this);
+        const int answer = dialogs::Message(
+            this,
+            UiText("note.this_file_has_unsaved_changes_save_before_closin"),
+            L"PenDown", wxYES_NO | wxCANCEL | wxICON_QUESTION);
         if (answer == wxCANCEL) {
             event.Veto();
             return;

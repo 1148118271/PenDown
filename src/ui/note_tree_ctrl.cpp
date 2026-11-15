@@ -4,6 +4,7 @@
 #include "ui/app_font.h"
 #include "ui/icon_library.h"
 #include "ui/theme.h"
+#include "ui/ui_text.h"
 
 #include <wx/control.h>
 #include <wx/dcclient.h>
@@ -142,7 +143,8 @@ void NoteTreeCtrl::OnDrawItem(wxDC& dc, const wxRect& rect, size_t n) const {
         dc.SetTextForeground(Theme::Text());
     }
 
-    wxString text = FromW(item.text.empty() ? L"无标题便签" : item.text);
+    wxString text =
+        item.text.empty() ? UiText("note.default_title") : FromW(item.text);
     int textX = TextX(item);
     int reserved = (item.kind == Kind::Group && item.count > 0) ? FromDIP(24) : FromDIP(10);
     int maxTextWidth = GetClientSize().x - textX - reserved;

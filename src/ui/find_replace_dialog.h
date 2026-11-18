@@ -14,7 +14,8 @@ public:
     void FocusFind();
 
 private:
-    void OnFind(wxCommandEvent& event);
+    void OnFindPrev(wxCommandEvent& event);
+    void OnFindNext(wxCommandEvent& event);
     void OnReplace(wxCommandEvent& event);
     void OnReplaceAll(wxCommandEvent& event);
     void OnClose(wxCloseEvent& event);

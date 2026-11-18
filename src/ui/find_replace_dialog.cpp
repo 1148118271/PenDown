@@ -53,13 +53,16 @@ FindReplaceDialog::FindReplaceDialog(wxWindow* parent, NoteEditor* editor)
     root->Add(options, 0, wxLEFT | wxRIGHT | wxTOP, margin);
 
     auto* buttons = new wxBoxSizer(wxHORIZONTAL);
-    auto* findButton =
+    auto* findPrevButton =
+        new wxButton(this, wxID_ANY, UiText("find.find_prev"));
+    auto* findNextButton =
         new wxButton(this, wxID_ANY, UiText("find.find_next"));
     auto* replaceButton = new wxButton(this, wxID_ANY, UiText("find.replace"));
     auto* replaceAllButton =
         new wxButton(this, wxID_ANY, UiText("find.replace_all"));
     auto* closeButton = new wxButton(this, wxID_CANCEL, UiText("find.close"));
-    buttons->Add(findButton, 0, wxRIGHT, FromDIP(6));
+    buttons->Add(findPrevButton, 0, wxRIGHT, FromDIP(6));
+    buttons->Add(findNextButton, 0, wxRIGHT, FromDIP(6));
     buttons->Add(replaceButton, 0, wxRIGHT, FromDIP(6));
     buttons->Add(replaceAllButton, 0, wxRIGHT, FromDIP(6));
     buttons->AddStretchSpacer(1);
@@ -67,11 +70,12 @@ FindReplaceDialog::FindReplaceDialog(wxWindow* parent, NoteEditor* editor)
     root->Add(buttons, 0, wxEXPAND | wxALL, margin);
 
     SetSizer(root);
-    SetSize(FromDIP(wxSize(520, 220)));
-    SetMinSize(FromDIP(wxSize(460, 200)));
+    SetSize(FromDIP(wxSize(580, 220)));
+    SetMinSize(FromDIP(wxSize(540, 200)));
     CentreOnParent();
 
-    findButton->Bind(wxEVT_BUTTON, &FindReplaceDialog::OnFind, this);
+    findPrevButton->Bind(wxEVT_BUTTON, &FindReplaceDialog::OnFindPrev, this);
+    findNextButton->Bind(wxEVT_BUTTON, &FindReplaceDialog::OnFindNext, this);
     replaceButton->Bind(wxEVT_BUTTON, &FindReplaceDialog::OnReplace, this);
     replaceAllButton->Bind(wxEVT_BUTTON, &FindReplaceDialog::OnReplaceAll, this);
     closeButton->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { Hide(); });
@@ -85,7 +89,15 @@ void FindReplaceDialog::FocusFind() {
     find_->SelectAll();
 }
 
-void FindReplaceDialog::OnFind(wxCommandEvent&) {
+void FindReplaceDialog::OnFindPrev(wxCommandEvent&) {
+    if (!editor_) return;
+    if (!editor_->FindPrevious(find_->GetValue(), matchCase_->GetValue(),
+                               wholeWord_->GetValue())) {
+        wxBell();
+    }
+}
+
+void FindReplaceDialog::OnFindNext(wxCommandEvent&) {
     if (!editor_) return;
     if (!editor_->FindNext(find_->GetValue(), matchCase_->GetValue(),
                            wholeWord_->GetValue())) {

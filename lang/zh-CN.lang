@@ -136,6 +136,9 @@ find.find="查找"
 # Find next
 find.find_next="查找下一个"
 
+# Find previous
+find.find_prev="查找上一个"
+
 # Find / Replace
 find.find_replace="查找 / 替换"
 

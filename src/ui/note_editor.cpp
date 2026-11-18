@@ -653,6 +653,15 @@ void NoteEditor::ApplyForeground(const wxColour& colour, bool clear) {
 }
 
 bool NoteEditor::FindNext(const wxString& text, bool matchCase, bool wholeWord) {
+    return FindWithDirection(text, matchCase, wholeWord, true);
+}
+
+bool NoteEditor::FindPrevious(const wxString& text, bool matchCase, bool wholeWord) {
+    return FindWithDirection(text, matchCase, wholeWord, false);
+}
+
+bool NoteEditor::FindWithDirection(const wxString& text, bool matchCase,
+                                   bool wholeWord, bool forward) {
     if (text.empty()) return false;
     const wxCharBuffer findUtf8 = text.ToUTF8();
     const int findLength = (int)findUtf8.length();
@@ -662,13 +671,17 @@ bool NoteEditor::FindNext(const wxString& text, bool matchCase, bool wholeWord) 
     if (matchCase) flags |= wxSTC_FIND_MATCHCASE;
     if (wholeWord) flags |= wxSTC_FIND_WHOLEWORD;
 
-    int start = GetSelectionEnd();
     const int textLength = GetTextLength();
-    if (start >= textLength) start = 0;
+    int start = forward ? GetSelectionEnd() : GetSelectionStart();
+    const int end = forward ? textLength : 0;
+    const int wrapStart = forward ? 0 : textLength;
+    if (forward ? (start >= textLength) : (start <= 0)) {
+        start = wrapStart;
+    }
 
     for (int attempt = 0; attempt < 2; ++attempt) {
         SetTargetStart(start);
-        SetTargetEnd(textLength);
+        SetTargetEnd(end);
         SetSearchFlags(flags);
         const int found = SearchInTarget(text);
         if (found >= 0) {
@@ -677,8 +690,8 @@ bool NoteEditor::FindNext(const wxString& text, bool matchCase, bool wholeWord) 
             SetFocus();
             return true;
         }
-        if (start == 0) break;
-        start = 0;
+        if (start == wrapStart) break;
+        start = wrapStart;
     }
     return false;
 }
@@ -1189,6 +1202,15 @@ bool RunNoteEditorSelfTest(wxString& report) {
     editor.SetSelection(0, 0);
     check(editor.FindNext(L"Second", false, false), L"find next");
     check(editor.GetSelectedText() == L"Second", L"find selection");
+    editor.SetDocument("alpha beta alpha gamma", styles);
+    editor.SetSelection(0, 0);
+    check(editor.FindPrevious(L"alpha", false, false) &&
+              editor.GetSelectionStart() == 11,
+          L"find previous wraps to last");
+    check(editor.FindPrevious(L"alpha", false, false) &&
+              editor.GetSelectionStart() == 0,
+          L"find previous moves to earlier match");
+    editor.SetDocument(text, styles);
     check(editor.ReplaceAll(L"line", L"row", false, false) == 1,
           L"replace all");
     check(editor.GetTextUtf8() == "Hello 中文 😀\nSecond row",

@@ -185,6 +185,21 @@ void NoteWindow::BuildUi() {
 
     const wxSize buttonSize = FromDIP(wxSize(26, 22));
 
+    // 清除样式和格式刷是高频的一次性动作，放到标题栏比藏在样式库里更顺手。
+    formatPainterButton_ = new IconButton(
+        titleBar, ID_NOTE_FORMAT_PAINTER, AppIcon::FormatPainter,
+        UiText("note.format_painter_copy_the_current_format_then_sele"),
+        IconButton::Kind::Normal, buttonSize, 12);
+    formatPainterButton_->SetEventTarget(this);
+    bar->Add(formatPainterButton_, 0, wxRIGHT, FromDIP(1));
+
+    clearFormatButton_ = new IconButton(
+        titleBar, ID_NOTE_CLEAR_FORMAT, AppIcon::Eraser,
+        UiText("note.clear_formatting_restore_default_font_size_color"),
+        IconButton::Kind::Normal, buttonSize, 12);
+    clearFormatButton_->SetEventTarget(this);
+    bar->Add(clearFormatButton_, 0, wxRIGHT, FromDIP(1));
+
     colorButton_ = new IconButton(
         titleBar, ID_NOTE_COLOR, AppIcon::Palette,
         UiText("note.text_color_background_color"),
@@ -198,21 +213,6 @@ void NoteWindow::BuildUi() {
         IconButton::Kind::Normal, buttonSize, 12);
     styleButton_->SetEventTarget(this);
     bar->Add(styleButton_, 0);
-
-    // 清除样式和格式刷是高频的一次性动作，放到标题栏比藏在样式库里更顺手。
-    clearFormatButton_ = new IconButton(
-        titleBar, ID_NOTE_CLEAR_FORMAT, AppIcon::Eraser,
-        UiText("note.clear_formatting_restore_default_font_size_color"),
-        IconButton::Kind::Normal, buttonSize, 12);
-    clearFormatButton_->SetEventTarget(this);
-    bar->Add(clearFormatButton_, 0, wxLEFT, FromDIP(1));
-
-    formatPainterButton_ = new IconButton(
-        titleBar, ID_NOTE_FORMAT_PAINTER, AppIcon::FormatPainter,
-        UiText("note.format_painter_copy_the_current_format_then_sele"),
-        IconButton::Kind::Normal, buttonSize, 12);
-    formatPainterButton_->SetEventTarget(this);
-    bar->Add(formatPainterButton_, 0, wxLEFT, FromDIP(1));
 
     bar->AddStretchSpacer(1);
 

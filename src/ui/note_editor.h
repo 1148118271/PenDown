@@ -61,6 +61,7 @@ public:
     }
 
     bool FindNext(const wxString& text, bool matchCase, bool wholeWord);
+    bool FindPrevious(const wxString& text, bool matchCase, bool wholeWord);
     int ReplaceAll(const wxString& text, const wxString& replacement,
                    bool matchCase, bool wholeWord);
     bool ReplaceCurrent(const wxString& replacement);
@@ -91,6 +92,8 @@ private:
     void ApplyPatchToRange(long start, long end, const StylePatch& patch,
                            const std::string* linkUrl = nullptr);
     void SetPending(const StylePatch& patch);
+    bool FindWithDirection(const wxString& text, bool matchCase, bool wholeWord,
+                           bool forward);
     // 链接文字需要 Scintilla 的 hotspot 标记才能 Ctrl+点击；按当前链接反推样式槽。
     void RefreshLinkHotspots();
 

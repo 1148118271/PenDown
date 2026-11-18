@@ -139,6 +139,9 @@ find.find="Find"
 # 查找下一个
 find.find_next="Find next"
 
+# 查找上一个
+find.find_prev="Find previous"
+
 # 查找 / 替换
 find.find_replace="Find / Replace"
 

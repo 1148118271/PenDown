@@ -18,7 +18,18 @@ int Message(wxWindow* parent, const wxString& message, const wxString& title,
     } else if (style & wxOK) {
         dialog.SetOKLabel(UiText("dialogs.ok"));
     }
-    return dialog.ShowModal();
+    switch (dialog.ShowModal()) {
+        case wxID_OK:
+            return wxOK;
+        case wxID_CANCEL:
+            return wxCANCEL;
+        case wxID_YES:
+            return wxYES;
+        case wxID_NO:
+            return wxNO;
+        default:
+            return wxCANCEL;
+    }
 }
 
 void LocalizeStandardButtons(wxWindow* dialog) {

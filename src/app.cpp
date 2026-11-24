@@ -32,6 +32,12 @@
 class PenDownApp : public wxApp {
 public:
     bool OnInit() override;
+    int OnRun() override;
+
+private:
+    bool ExitImmediately(int code);
+    bool m_skipMainLoop = false;
+    int m_exitCode = 0;
 };
 
 wxIMPLEMENT_APP(PenDownApp);
@@ -125,14 +131,12 @@ bool PenDownApp::OnInit() {
 
     if (!selfTestReport.empty()) {
         const bool ok = RunSelfTest(ToW(selfTestReport));
-        SetErrorExitCode(ok ? 0 : 1);
-        return false;
+        return ExitImmediately(ok ? 0 : 1);
     }
 
     if (!gitSelfTestReport.empty()) {
         const int exitCode = RunGitSelfTest(ToW(gitSelfTestReport));
-        SetErrorExitCode(exitCode);
-        return false;
+        return ExitImmediately(exitCode);
     }
 
     if (!editorSelfTestReport.empty()) {
@@ -145,21 +149,18 @@ bool PenDownApp::OnInit() {
             const wxScopedCharBuffer utf8 = report.ToUTF8();
             file.Write(utf8.data(), utf8.length());
         }
-        SetErrorExitCode(ok ? 0 : 1);
-        return false;
+        return ExitImmediately(ok ? 0 : 1);
     }
 
     if (!benchInput.empty() && !benchReport.empty()) {
         const bool ok = RunNoteEditorBench(ToW(benchInput), ToW(benchReport));
-        SetErrorExitCode(ok ? 0 : 1);
-        return false;
+        return ExitImmediately(ok ? 0 : 1);
     }
 
 #ifdef __WXMSW__
     if (!ClaimSingleInstance()) {
         // 已有实例在运行不是错误，第二个进程正常退出即可。
-        SetErrorExitCode(0);
-        return false;
+        return ExitImmediately(0);
     }
 #endif
 
@@ -206,4 +207,22 @@ bool PenDownApp::OnInit() {
     auto* frame = new MainFrame(store);
     frame->Show();
     return true;
+}
+
+bool PenDownApp::ExitImmediately(int code) {
+#if wxCHECK_VERSION(3, 3, 0)
+    SetErrorExitCode(code);
+    return false;
+#else
+    m_skipMainLoop = true;
+    m_exitCode = code;
+    return true;
+#endif
+}
+
+int PenDownApp::OnRun() {
+    if (m_skipMainLoop) {
+        return m_exitCode;
+    }
+    return wxApp::OnRun();
 }
